@@ -1,5 +1,35 @@
 import React, { useState } from 'react';
-import { User, Mail, Bell, Shield } from 'lucide-react';
+import { Bell, Shield, Briefcase, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { useBusinessForm } from '../../hooks/useBusinessForm';
+import BusinessVerification from '../business/BusinessVerification';
+import { submitVerification } from '../../api/businessVerification';
+
+// Error Boundary Component
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode; fallback: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Business Verification Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+
+    return this.props.children;
+  }
+}
 
 export default function Settings() {
   const [formData, setFormData] = useState({
@@ -8,6 +38,16 @@ export default function Settings() {
     email: 'john.doe@example.com',
     phone: '+1 (555) 123-4567'
   });
+
+  const {
+    formData: businessData,
+    errors,
+    isLoading,
+    isSuccess,
+    errorMessage,
+    handleInputChange: handleBusinessInputChange,
+    handleSubmit: handleBusinessSubmit
+  } = useBusinessForm();
 
   const [notifications, setNotifications] = useState({
     orders: true,
@@ -92,6 +132,189 @@ export default function Settings() {
               />
             </div>
           </div>
+        </div>
+
+        {/* Business Information Section */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-8 relative">
+          {isLoading && (
+            <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
+              <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+            </div>
+          )}
+          
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center">
+              <Briefcase className="h-5 w-5 text-gray-400 mr-2" />
+              <h3 className="text-lg font-medium text-gray-900">Business Information</h3>
+            </div>
+            {(isSuccess || errorMessage) && (
+              <div className={`flex items-center ${isSuccess ? 'text-green-600' : 'text-red-600'}`}>
+                {isSuccess ? (
+                  <CheckCircle className="h-5 w-5 mr-2" />
+                ) : (
+                  <XCircle className="h-5 w-5 mr-2" />
+                )}
+                <span className="text-sm">
+                  {isSuccess ? 'Changes saved successfully!' : errorMessage}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="businessName" className="block text-sm font-medium text-gray-700">
+                Business Name *
+              </label>
+              <input
+                type="text"
+                name="businessName"
+                id="businessName"
+                value={businessData.businessName}
+                onChange={handleBusinessInputChange}
+                className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                  errors.businessName ? 'border-red-300' : 'border-gray-300'
+                }`}
+                placeholder="Enter your business name"
+              />
+              {errors.businessName && (
+                <p className="mt-1 text-sm text-red-600">{errors.businessName}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="businessPhone" className="block text-sm font-medium text-gray-700">
+                Business Phone *
+              </label>
+              <input
+                type="tel"
+                name="businessPhone"
+                id="businessPhone"
+                value={businessData.businessPhone}
+                onChange={handleBusinessInputChange}
+                className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                  errors.businessPhone ? 'border-red-300' : 'border-gray-300'
+                }`}
+                placeholder="Enter business phone number"
+              />
+              {errors.businessPhone && (
+                <p className="mt-1 text-sm text-red-600">{errors.businessPhone}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="businessEmail" className="block text-sm font-medium text-gray-700">
+                Business Email *
+              </label>
+              <input
+                type="email"
+                name="businessEmail"
+                id="businessEmail"
+                value={businessData.businessEmail}
+                onChange={handleBusinessInputChange}
+                className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                  errors.businessEmail ? 'border-red-300' : 'border-gray-300'
+                }`}
+                placeholder="Enter business email address"
+              />
+              {errors.businessEmail && (
+                <p className="mt-1 text-sm text-red-600">{errors.businessEmail}</p>
+              )}
+            </div>
+
+            <div className="md:col-span-2">
+              <label htmlFor="businessAddress" className="block text-sm font-medium text-gray-700">
+                Business Address *
+              </label>
+              <input
+                type="text"
+                name="businessAddress"
+                id="businessAddress"
+                value={businessData.businessAddress}
+                onChange={handleBusinessInputChange}
+                className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                  errors.businessAddress ? 'border-red-300' : 'border-gray-300'
+                }`}
+                placeholder="Enter business address"
+              />
+              {errors.businessAddress && (
+                <p className="mt-1 text-sm text-red-600">{errors.businessAddress}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="taxId" className="block text-sm font-medium text-gray-700">
+                Tax ID Number *
+              </label>
+              <input
+                type="text"
+                name="taxId"
+                id="taxId"
+                value={businessData.taxId}
+                onChange={handleBusinessInputChange}
+                className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                  errors.taxId ? 'border-red-300' : 'border-gray-300'
+                }`}
+                placeholder="Enter tax ID number"
+              />
+              {errors.taxId && (
+                <p className="mt-1 text-sm text-red-600">{errors.taxId}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="businessType" className="block text-sm font-medium text-gray-700">
+                Business Type *
+              </label>
+              <input
+                type="text"
+                name="businessType"
+                id="businessType"
+                value={businessData.businessType}
+                onChange={handleBusinessInputChange}
+                className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                  errors.businessType ? 'border-red-300' : 'border-gray-300'
+                }`}
+                placeholder="e.g., Gift Shop, Resort Store"
+              />
+              {errors.businessType && (
+                <p className="mt-1 text-sm text-red-600">{errors.businessType}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <button
+              onClick={handleBusinessSubmit}
+              disabled={isLoading}
+              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Business Information'
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Business Verification Section */}
+        <div className="mt-8">
+          <ErrorBoundary fallback={<div>Something went wrong with business verification</div>}>
+            <BusinessVerification
+              currentStatus="pending"
+              onSubmit={async (files: File[]) => {
+                try {
+                  await submitVerification(files);
+                } catch (error) {
+                  throw new Error(error instanceof Error ? error.message : 'Failed to submit documents');
+                }
+              }}
+            />
+          </ErrorBoundary>
         </div>
 
         {/* Notifications Section */}

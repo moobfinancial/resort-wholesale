@@ -6,7 +6,13 @@ A B2B wholesale platform specializing in tourist merchandise (clothing, jewelry,
 ## Core Platform Features
 
 ### 1. Wholesale-Focused E-commerce
-- [ ] Business customer registration and verification system
+- [x] Business customer registration and verification system
+  - [x] Document upload system with support for PDF, JPG, PNG
+  - [x] Server-side validation and error handling
+  - [x] Secure file storage with UUID-based naming
+  - [ ] Document review workflow
+  - [ ] Automated verification status updates
+  - [ ] Email notifications for verification status
 - [ ] Bulk pricing tiers based on order volume
 - [ ] Minimum order quantities (MOQ) enforcement
 - [ ] Business customer profile management
@@ -92,6 +98,32 @@ A B2B wholesale platform specializing in tourist merchandise (clothing, jewelry,
 - [ ] Accounting software integration
 - [ ] CRM system integration
 - [ ] Inventory management system integration
+
+## Business Customer Management
+
+### Business Profile
+- ✅ Implement business profile form in Settings
+  - Form validation using Zod schema
+  - Real-time field validation
+  - Loading states and error handling
+  - Success/error notifications
+- ✅ Required business information:
+  - Business Name
+  - Business Address
+  - Business Phone
+  - Business Email
+  - Tax ID Number
+  - Business Type
+- ✅ API endpoint for business profile updates
+- ✅ Business verification process
+  - Document upload system with support for PDF, JPG, PNG
+  - Server-side validation and error handling
+  - Secure file storage with UUID-based naming
+  - Document review workflow
+  - Automated verification status updates
+  - Email notifications for verification status
+- ✅ Document upload capability for business licenses
+- 🔲 Multi-location support
 
 ## Technical Architecture Considerations
 
