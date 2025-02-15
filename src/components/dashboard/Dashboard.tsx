@@ -8,6 +8,8 @@ import {
   LogOut,
   Home
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useCustomerAuthStore } from '../../stores/customerAuth';
 import PurchaseHistory from './PurchaseHistory';
 import PaymentMethods from './PaymentMethods';
 import PendingDeliveries from './PendingDeliveries';
@@ -18,6 +20,8 @@ type TabType = 'purchases' | 'payments' | 'deliveries' | 'payment-methods' | 'se
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('purchases');
+  const navigate = useNavigate();
+  const logout = useCustomerAuthStore(state => state.logout);
 
   const tabs = [
     { id: 'purchases', label: 'Purchase History', icon: ShoppingBag },
@@ -26,6 +30,11 @@ export default function Dashboard() {
     { id: 'payment-methods', label: 'Payment Methods', icon: CreditCard },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
+
+  const handleSignOut = () => {
+    logout();
+    navigate('/');
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -57,7 +66,10 @@ export default function Dashboard() {
               </a>
             </div>
             <div className="flex items-center">
-              <button className="flex items-center text-gray-500 hover:text-gray-700">
+              <button 
+                onClick={handleSignOut}
+                className="flex items-center text-gray-500 hover:text-gray-700"
+              >
                 <LogOut className="h-5 w-5 mr-2" />
                 Sign Out
               </button>

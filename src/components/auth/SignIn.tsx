@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock } from 'lucide-react';
+import { useCustomerAuthStore } from '../../stores/customerAuth';
 
 interface SignInProps {
   onClose: () => void;
@@ -9,16 +10,33 @@ interface SignInProps {
 export default function SignIn({ onClose, onSignIn }: SignInProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const login = useCustomerAuthStore(state => state.login);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement actual authentication
-    console.log('Sign in:', { email, password });
-    onSignIn(); // Call the onSignIn callback to update the app state
+    setError('');
+    
+    try {
+      await login(email, password);
+      onSignIn(); // Call the onSignIn callback to update the app state
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sign in');
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="rounded-md bg-red-50 p-4">
+          <div className="flex">
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">{error}</h3>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-gray-700">
           Email address
@@ -99,7 +117,7 @@ export default function SignIn({ onClose, onSignIn }: SignInProps) {
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button
             type="button"
-            className="w-full inline-flex justify-center py-2.5 px-4 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+            className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
           >
             <img
               className="h-5 w-5"
@@ -110,11 +128,11 @@ export default function SignIn({ onClose, onSignIn }: SignInProps) {
           </button>
           <button
             type="button"
-            className="w-full inline-flex justify-center py-2.5 px-4 rounded-lg shadow-sm bg-[#1877F2] text-sm font-medium text-white hover:bg-[#1865D9]"
+            className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
           >
             <img
               className="h-5 w-5"
-              src="https://www.svgrepo.com/show/475647/facebook-color.svg"
+              src="https://www.svgrepo.com/show/448234/facebook.svg"
               alt="Facebook logo"
             />
             <span className="ml-2">Facebook</span>

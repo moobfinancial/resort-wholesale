@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
-import type { User } from '@supabase/supabase-js';
+import { api } from '../lib/api';
 
 interface Profile {
   id: string;
@@ -12,7 +11,7 @@ interface Profile {
 }
 
 interface AuthState {
-  user: User | null;
+  user: any | null;
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -24,56 +23,43 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   profile: null,
-  loading: true,
+  loading: false,
 
   signIn: async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
-    await get().loadProfile();
+    try {
+      set({ loading: true });
+      const { token, user } = await api.auth.login(email, password);
+      
+      // Store the token in localStorage
+      localStorage.setItem('authToken', token);
+      
+      set({ user, loading: false });
+    } catch (error) {
+      set({ loading: false });
+      throw error;
+    }
   },
 
   signUp: async (email: string, password: string, isWholesale: boolean) => {
-    const { error: signUpError, data } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    if (signUpError) throw signUpError;
-
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          user_id: data.user.id,
-          is_wholesale: isWholesale,
-        });
-      if (profileError) throw profileError;
-    }
+    // TODO: Implement signup functionality
+    throw new Error('Signup not implemented');
   },
 
   signOut: async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    set({ user: null, profile: null });
+    try {
+      await api.auth.logout();
+      localStorage.removeItem('authToken');
+      set({ user: null, profile: null });
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still clear local state even if the API call fails
+      localStorage.removeItem('authToken');
+      set({ user: null, profile: null });
+    }
   },
 
   loadProfile: async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    set({ user });
-
-    if (user) {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error) throw error;
-      set({ profile, loading: false });
-    } else {
-      set({ loading: false });
-    }
+    // TODO: Implement profile loading
+    return;
   },
 }));

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bell, Shield, Briefcase, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { useBusinessForm } from '../../hooks/useBusinessForm';
 import BusinessVerification from '../business/BusinessVerification';
 import { submitVerification } from '../../api/businessVerification';
+import { useCustomerAuthStore } from '../../stores/customerAuth';
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component<
@@ -32,12 +33,57 @@ class ErrorBoundary extends React.Component<
 }
 
 export default function Settings() {
+  const { user, updateProfile } = useCustomerAuthStore();
   const [formData, setFormData] = useState({
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    phone: '+1 (555) 123-4567'
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    email: user?.email || '',
+    phone: ''
   });
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: formData.phone // Keep existing phone number if any
+      });
+    }
+  }, [user]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+    // Clear any previous messages
+    setSaveError('');
+    setSaveSuccess(false);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setSaveError('');
+    setSaveSuccess(false);
+
+    try {
+      await updateProfile({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email
+      });
+      setSaveSuccess(true);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to update profile');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const {
     formData: businessData,
@@ -56,13 +102,6 @@ export default function Settings() {
     deliveries: true
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
   const handleNotificationToggle = (key: keyof typeof notifications) => {
     setNotifications({
       ...notifications,
@@ -76,8 +115,29 @@ export default function Settings() {
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Account Settings</h2>
         
         {/* Profile Section */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+        <form onSubmit={handleSaveProfile} className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Profile Information</h3>
+          
+          {saveError && (
+            <div className="mb-4 rounded-md bg-red-50 p-4">
+              <div className="flex">
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">{saveError}</h3>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {saveSuccess && (
+            <div className="mb-4 rounded-md bg-green-50 p-4">
+              <div className="flex">
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-green-800">Profile updated successfully!</h3>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
@@ -132,7 +192,24 @@ export default function Settings() {
               />
             </div>
           </div>
-        </div>
+          
+          <div className="mt-4">
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </button>
+          </div>
+        </form>
 
         {/* Business Information Section */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8 relative">

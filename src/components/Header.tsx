@@ -3,25 +3,21 @@ import { ShoppingCart, User } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PricingMode } from '../types';
 import AuthModal from './auth/AuthModal';
+import { useCustomerAuthStore } from '../stores/customerAuth';
 
 interface HeaderProps {
   pricingMode: PricingMode;
   setPricingMode: (mode: PricingMode) => void;
-  isLoggedIn: boolean;
-  setIsLoggedIn: (value: boolean) => void;
 }
 
-export default function Header({ 
-  pricingMode, 
-  setPricingMode,
-  isLoggedIn,
-  setIsLoggedIn 
-}: HeaderProps) {
+export default function Header({ pricingMode, setPricingMode }: HeaderProps) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const navigate = useNavigate();
+  const isLoggedIn = useCustomerAuthStore(state => state.isAuthenticated);
+  const logout = useCustomerAuthStore(state => state.logout);
 
   const handleSignOut = () => {
-    setIsLoggedIn(false);
+    logout();
     navigate('/');
   };
 
@@ -90,7 +86,6 @@ export default function Header({
         isOpen={isAuthModalOpen} 
         onClose={() => setIsAuthModalOpen(false)}
         onSignIn={() => {
-          setIsLoggedIn(true);
           setIsAuthModalOpen(false);
           navigate('/dashboard');
         }}

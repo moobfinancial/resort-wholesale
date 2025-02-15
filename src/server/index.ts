@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -5,6 +6,9 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import fs from 'fs';
 import debug from 'debug';
+import authRoutes from './routes/auth';
+import customerAuthRoutes from './routes/customerAuth';
+import inventoryRoutes from './routes/inventory';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -14,21 +18,29 @@ const app = express();
 
 // CORS configuration
 const corsOptions = {
-  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176'],
+  origin: process.env.NODE_ENV === 'production'
+    ? process.env.FRONTEND_URL
+    : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5175', 'http://localhost:5176'], 
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Content-Type'],
-  credentials: true,
-  optionsSuccessStatus: 200
+  exposedHeaders: ['Content-Type', 'Authorization']
 };
 
-// Middleware
+// Apply CORS middleware before other middleware
 app.use(cors(corsOptions));
-app.use(express.json());
+
+// Enable pre-flight requests for all routes
+app.options('*', cors(corsOptions));
+
+// Body parsing middleware
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, '../../uploads');
 const businessDocsDir = path.join(uploadsDir, 'business-documents');
+const productsDir = path.join(uploadsDir, 'products');
 
 try {
   // Create base uploads directory
@@ -42,18 +54,26 @@ try {
     log('Creating business-documents directory:', businessDocsDir);
     fs.mkdirSync(businessDocsDir);
   }
+
+  // Create products directory
+  if (!fs.existsSync(productsDir)) {
+    log('Creating products directory:', productsDir);
+    fs.mkdirSync(productsDir);
+  }
 } catch (error) {
   console.error('Error creating directories:', error);
 }
 
-// Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Global error handler:', err);
-  res.status(500).json({
-    status: 'error',
-    message: err.message || 'An unexpected error occurred'
-  });
-});
+// Serve static files from the uploads directory
+app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
+
+// API Routes
+app.use('/api/admin/auth', authRoutes);
+app.use('/api/customer/auth', customerAuthRoutes);
+app.use('/api/admin/inventory', inventoryRoutes);
+
+// Serve static files from products directory
+app.use('/products', express.static(path.join(__dirname, '../../uploads/products')));
 
 // Add business verification routes
 try {
@@ -64,11 +84,17 @@ try {
   console.error('Error loading business verification routes:', error);
 }
 
-// Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
+// Error handling middleware
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('Global error handler:', err);
+  res.status(500).json({
+    status: 'error',
+    message: err.message || 'An unexpected error occurred'
+  });
+});
 
 // Handle 404s
-app.use((req: express.Request, res: express.Response) => {
+app.use((_req: express.Request, res: express.Response) => {
   res.status(404).json({
     status: 'error',
     message: 'Not found'
@@ -82,6 +108,7 @@ const server = app.listen(PORT, () => {
   log('Upload directories:');
   log('- Base:', uploadsDir);
   log('- Business docs:', businessDocsDir);
+  log('- Products:', productsDir);
 });
 
 // Handle server errors
