@@ -130,3 +130,60 @@ export const api = {
       })
   },
 };
+
+// Product API for frontend
+export const frontendProductApi = {
+  listProducts: async (params: {
+    category?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+    sort?: string;
+  }) => {
+    const response = await request<{ products: any[]; total: number; hasMore: boolean }>('/products', { params });
+    return {
+      status: 'success',
+      data: response.data
+    };
+  },
+  
+  getProduct: async (id: string) => {
+    const response = await request<any>(`/products/${id}`);
+    return {
+      status: 'success',
+      data: response.data
+    };
+  },
+  
+  getRelatedProducts: async (id: string) => {
+    const response = await request<any[]>(`/products/${id}/related`);
+    return {
+      status: 'success',
+      data: response.data
+    };
+  },
+  
+  getCategories: async () => {
+    const response = await request<any[]>('/products/categories');
+    return {
+      status: 'success',
+      data: response.data
+    };
+  },
+  
+  getFeaturedProducts: async () => {
+    const response = await request<any[]>('/products/featured');
+    return {
+      status: 'success',
+      data: response.data
+    };
+  },
+  
+  getNewArrivals: async () => {
+    const response = await request<any[]>('/products/new-arrivals');
+    return {
+      status: 'success',
+      data: response.data
+    };
+  }
+};

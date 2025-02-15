@@ -4,6 +4,11 @@ import { adminRoutes } from './admin/routes';
 import ErrorBoundary from './components/ErrorBoundary';
 import Home from './pages/Home';
 import Dashboard from './components/dashboard/Dashboard';
+import Products from './pages/Products';
+import ProductDetail from './pages/ProductDetail';
+import Layout from './components/Layout';
+import AboutUs from './pages/AboutUs';
+import ContactUs from './pages/ContactUs';
 
 const FEATURED_PRODUCTS = [
   {
@@ -81,7 +86,7 @@ const HomePage = () => {
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <App />,
+    element: <Layout />,
     errorElement: <ErrorBoundary />,
     children: [
       {
@@ -89,10 +94,22 @@ export const router = createBrowserRouter([
         element: <Home />,
       },
       {
-        path: 'dashboard',
-        element: <Dashboard />,
+        path: 'products',
+        element: <Products />,
+      },
+      {
+        path: 'products/:id',
+        element: <ProductDetail />,
+      },
+      {
+        path: 'about',
+        element: <AboutUs />,
+      },
+      {
+        path: 'contact',
+        element: <ContactUs />,
       },
     ],
   },
-  ...adminRoutes,
+  ...adminRoutes, // Admin routes should be at the root level
 ]);

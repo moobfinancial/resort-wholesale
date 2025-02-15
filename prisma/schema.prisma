@@ -9,32 +9,31 @@ generator client {
 }
 
 model Product {
-  id          String      @id @default(uuid())
+  id          String        @id @default(uuid())
   name        String
   description String
   category    String
   tags        String[]
-  price       Decimal     @db.Decimal(10, 2)
+  price       Decimal      @db.Decimal(10, 2)
   imageUrl    String
-  sku         String      @unique
-  stock       Int         @default(0)
-  minOrder    Int         @default(1)
-  isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  
-  // Wholesale specific fields
+  sku         String       @unique
+  stock       Int          @default(0)
+  minOrder    Int          @default(1)
+  isActive    Boolean      @default(true)
+  isFeatured  Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
   bulkPricing BulkPricing[]
 }
 
 model BulkPricing {
-  id          String    @id @default(uuid())
-  productId   String
+  id          String   @id @default(uuid())
   minQuantity Int
-  price       Decimal   @db.Decimal(10, 2)
-  product     Product   @relation(fields: [productId], references: [id])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  price       Decimal  @db.Decimal(10, 2)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([productId, minQuantity])
 }

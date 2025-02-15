@@ -9,6 +9,7 @@ import debug from 'debug';
 import authRoutes from './routes/auth';
 import customerAuthRoutes from './routes/customerAuth';
 import inventoryRoutes from './routes/inventory';
+import productRoutes from './routes/products';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -69,8 +70,32 @@ app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
 // API Routes
 app.use('/api/admin/auth', authRoutes);
+console.log('Registered admin auth routes');
+
 app.use('/api/customer/auth', customerAuthRoutes);
+console.log('Registered customer auth routes');
+
 app.use('/api/admin/inventory', inventoryRoutes);
+console.log('Registered inventory routes');
+
+app.use('/api/products', productRoutes);
+console.log('Registered product routes');
+
+// Log all registered routes
+app._router.stack.forEach((middleware: any) => {
+  if (middleware.route) {
+    // Routes registered directly on the app
+    console.log(`Route: ${middleware.route.path}`);
+  } else if (middleware.name === 'router') {
+    // Router middleware
+    middleware.handle.stack.forEach((handler: any) => {
+      if (handler.route) {
+        console.log(`Route: ${middleware.regexp} ${handler.route.path}`);
+        console.log(`Methods: ${Object.keys(handler.route.methods)}`);
+      }
+    });
+  }
+});
 
 // Serve static files from products directory
 app.use('/products', express.static(path.join(__dirname, '../../uploads/products')));

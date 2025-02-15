@@ -146,50 +146,59 @@ export const productService = {
   },
 
   async listProducts(params: {
-    skip?: number;
-    take?: number;
-    category?: string;
-    search?: string;
-    isActive?: boolean;
+    where?: Prisma.ProductWhereInput;
+    orderBy?: Prisma.ProductOrderByWithRelationInput;
+    page?: number;
+    limit?: number;
   }) {
-    const where: Prisma.ProductWhereInput = {};
-
-    if (params.category) {
-      where.category = params.category;
-    }
-
-    if (params.search) {
-      where.OR = [
-        { name: { contains: params.search, mode: 'insensitive' } },
-        { description: { contains: params.search, mode: 'insensitive' } },
-        { tags: { has: params.search } }
-      ];
-    }
-
-    if (params.isActive !== undefined) {
-      where.isActive = params.isActive;
-    }
+    const skip = params.page && params.limit ? (params.page - 1) * params.limit : params.where?.skip;
+    const take = params.limit || params.where?.take;
 
     const [products, total] = await Promise.all([
       prisma.product.findMany({
-        where,
-        skip: params.skip,
-        take: params.take,
+        where: params.where,
+        skip,
+        take,
         include: {
           bulkPricing: true
         },
-        orderBy: {
+        orderBy: params.orderBy || {
           createdAt: 'desc'
         }
       }),
-      prisma.product.count({ where })
+      prisma.product.count({ where: params.where })
     ]);
 
     return {
       products,
       total,
-      hasMore: params.take ? total > (params.skip || 0) + params.take : false
+      hasMore: take ? total > (skip || 0) + take : false
     };
+  },
+
+  async getCategories() {
+    const products = await prisma.product.findMany({
+      where: { isActive: true },
+      select: {
+        category: true
+      },
+      distinct: ['category']
+    });
+
+    return products.map((product, index) => ({
+      id: product.category,
+      name: product.category,
+      count: 0  // We'll update this in a separate query
+    }));
+  },
+
+  async getCategoryCount(category: string) {
+    return prisma.product.count({
+      where: {
+        category,
+        isActive: true
+      }
+    });
   },
 
   async deleteProduct(id: string) {
