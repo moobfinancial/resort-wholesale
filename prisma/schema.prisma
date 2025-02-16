@@ -8,6 +8,13 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum ProductStatus {
+  draft
+  pending_approval
+  approved_unpublished
+  published
+}
+
 model Product {
   id          String        @id @default(uuid())
   name        String
@@ -21,6 +28,9 @@ model Product {
   minOrder    Int          @default(1)
   isActive    Boolean      @default(true)
   isFeatured  Boolean      @default(false)
+  status      ProductStatus @default(draft)
+  approvedAt  DateTime?
+  approvedBy  String?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   bulkPricing BulkPricing[]
@@ -36,4 +46,57 @@ model BulkPricing {
   updatedAt   DateTime @updatedAt
 
   @@unique([productId, minQuantity])
+}
+
+model Collection {
+  id          String    @id @default(uuid())
+  name        String
+  description String
+  imageUrl    String
+  displayOrder Int      @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Authentication Models
+model Customer {
+  id              String           @id @default(uuid())
+  email           String           @unique
+  password        String
+  firstName       String
+  lastName        String
+  isEmailVerified Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  refreshTokens   RefreshToken[]
+  passwordResets  PasswordReset[]
+}
+
+model Admin {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  password  String
+  role      String    @default("admin")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  token      String    @unique
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+}
+
+model PasswordReset {
+  id         String    @id @default(uuid())
+  token      String    @unique
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  used       Boolean   @default(false)
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
 }
