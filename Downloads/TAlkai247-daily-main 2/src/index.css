@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --radius: 1rem;
+  
+  /* Theme colors */
+  --primary: 158 92% 53%;
+  --primary-hover: 158 92% 47%;
+  --background: 222 29% 8%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 11%;
+  --card-foreground: 210 40% 98%;
+  --border: 217 19% 27%;
+  --input: 217 19% 27%;
+  --ring: 158 92% 53%;
+  --destructive: 0 84% 60%;
+  --destructive-hover: 0 84% 55%;
+}
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Custom button styles */
+.btn-primary {
+  @apply bg-[#26E9C1] hover:bg-[#1CD6AF] text-black font-medium rounded-xl transition-colors;
+}
+
+.btn-secondary {
+  @apply bg-[#1A2234] hover:bg-[#2A3344] text-white font-medium rounded-xl border border-[#2A3344] transition-colors;
+}
+
+.btn-destructive {
+  @apply bg-red-500 hover:bg-red-600 text-white font-medium rounded-xl transition-colors;
+}
+
+/* Card styles */
+.card {
+  @apply bg-[#1A2234] border-[#2A3344] rounded-xl;
+}
+
+/* Input styles */
+.input {
+  @apply bg-[#1A2234] border-[#2A3344] rounded-xl text-white placeholder:text-gray-500;
+}

@@ -1,0 +1,215 @@
+// This is your Prisma schema file
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// User model
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String    // Added password field
+  name          String
+  company       String?
+  role          UserRole  @default(USER)
+  phoneNumber   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  settings      Json      // Stores user settings as JSON
+  assistants    Assistant[]
+  contacts      Contact[]
+  calls         Call[]
+  templates     WhisperTemplate[]
+  campaigns     Campaign[]
+  resources     Resource[]
+  assistantTemplates AssistantTemplate[]
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+// Assistant model
+model Assistant {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  name         String
+  modes        String[]  // Array of modes (web, voice)
+  firstMessage String
+  systemPrompt String    @db.Text
+  provider     String
+  model        String
+  tools        Json      // Stores tools configuration as JSON
+  voice        Json      // Stores voice settings as JSON
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  calls        Call[]
+}
+
+// Contact model
+model Contact {
+  id                String           @id @default(cuid())
+  userId            String
+  name              String
+  email             String
+  phone             String
+  type              ContactType
+  transparencyLevel TransparencyLevel
+  subcategory       String?
+  customSubcategory String?
+  campaignId        String?
+  tags              String[]
+  notes             String?          @db.Text
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  lastContactedAt   DateTime?
+  calls             Call[]
+  campaign          Campaign?        @relation(fields: [campaignId], references: [id])
+  user              User            @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([campaignId])
+}
+
+enum ContactType {
+  PERSONAL
+  BUSINESS
+}
+
+enum TransparencyLevel {
+  FULL
+  PARTIAL
+  NONE
+}
+
+// Call model
+model Call {
+  id                String    @id @default(cuid())
+  userId            String
+  contactId         String
+  assistantId       String
+  startTime         DateTime
+  endTime           DateTime?
+  duration          Int?      // Duration in seconds
+  status            CallStatus
+  recording         Json?     // Stores recording info as JSON
+  transcript        Json[]    // Array of transcript entries
+  goals             Json[]    // Array of call goals
+  metrics           Json      // Stores call metrics as JSON
+  notes             String?   @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  user              User      @relation(fields: [userId], references: [id])
+  contact           Contact   @relation(fields: [contactId], references: [id])
+  assistant         Assistant @relation(fields: [assistantId], references: [id])
+
+  @@index([userId])
+  @@index([contactId])
+  @@index([assistantId])
+}
+
+enum CallStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+// WhisperTemplate model
+model WhisperTemplate {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  type          TemplateType
+  systemPrompt  String    @db.Text
+  editablePrompt String   @db.Text
+  isSystem      Boolean   @default(false)
+  isHidden      Boolean   @default(false)
+  tags          String[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+enum TemplateType {
+  BUSINESS
+  PERSONAL
+}
+
+// Assistant Template model
+model AssistantTemplate {
+  id           String    @id @default(cuid())
+  name         String
+  description  String?
+  tags         String[]
+  type         String    // 'system' or 'user'
+  systemPrompt String    @db.Text
+  firstMessage String
+  tools        Json      // Array of tool configurations
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdBy    String?   // userId of template creator (null for system templates)
+  user         User?     @relation(fields: [createdBy], references: [id])
+}
+
+// Campaign model
+model Campaign {
+  id              String    @id @default(cuid())
+  userId          String
+  name            String
+  description     String?   @db.Text
+  startDate       DateTime
+  endDate         DateTime?
+  status          CampaignStatus
+  contacts        Contact[]
+  goals           Json[]    // Array of campaign goals
+  metrics         Json      // Stores campaign metrics as JSON
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+// Resource model
+model Resource {
+  id          String    @id @default(cuid())
+  userId      String
+  title       String
+  type        ResourceType
+  url         String
+  description String?   @db.Text
+  tags        String[]
+  isPublic    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+enum ResourceType {
+  DOCUMENTATION
+  GUIDE
+  TUTORIAL
+  WHITEPAPER
+  VIDEO
+}
