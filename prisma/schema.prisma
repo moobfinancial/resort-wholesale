@@ -1,0 +1,237 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id           String   @id
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+}
+
+model BulkPricing {
+  id          String   @id
+  minQuantity Int
+  price       Decimal  @db.Decimal(10, 2)
+  productId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  Product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, minQuantity])
+}
+
+model Collection {
+  id          String    @id
+  name        String
+  description String
+  imageUrl    String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  Product     Product[]
+}
+
+model Customer {
+  id                    String                  @id
+  companyName           String
+  contactName           String
+  email                 String                  @unique
+  phone                 String
+  address               Json
+  businessType          String
+  taxId                 String
+  status                CustomerStatus          @default(PENDING)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime
+  password              String
+  CustomerDocument      CustomerDocument[]
+  CustomerStatusHistory CustomerStatusHistory[]
+  Order                 Order[]
+  RequiredDocument      RequiredDocument[]
+}
+
+model CustomerDocument {
+  id                 String            @id
+  url                String
+  customerId         String
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime
+  requiredDocumentId String?
+  status             DocumentStatus    @default(PENDING)
+  Customer           Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  RequiredDocument   RequiredDocument? @relation(fields: [requiredDocumentId], references: [id])
+}
+
+model CustomerStatusHistory {
+  id         String         @id
+  status     CustomerStatus
+  comment    String
+  customerId String
+  userId     String
+  createdAt  DateTime       @default(now())
+  Customer   Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  User       User           @relation(fields: [userId], references: [id])
+}
+
+model Order {
+  id            String        @id
+  orderNumber   String        @unique
+  customerId    String
+  status        OrderStatus   @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
+  paymentMethod String
+  subtotal      Decimal       @db.Decimal(10, 2)
+  tax           Decimal       @db.Decimal(10, 2)
+  shipping      Decimal       @db.Decimal(10, 2)
+  total         Decimal       @db.Decimal(10, 2)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime
+  Customer      Customer      @relation(fields: [customerId], references: [id])
+  OrderItem     OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id
+  orderId   String
+  productId String
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
+  Order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  Product   Product @relation(fields: [productId], references: [id])
+}
+
+model Product {
+  id             String           @id
+  name           String
+  description    String
+  category       String
+  tags           String[]
+  price          Decimal          @db.Decimal(10, 2)
+  imageUrl       String
+  sku            String           @unique
+  stock          Int              @default(0)
+  minOrder       Int              @default(1)
+  isActive       Boolean          @default(true)
+  isFeatured     Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  status         ProductStatus    @default(DRAFT)
+  supplierId     String?
+  BulkPricing    BulkPricing[]
+  OrderItem      OrderItem[]
+  Supplier       Supplier?        @relation(fields: [supplierId], references: [id])
+  ProductVariant ProductVariant[]
+  Collection     Collection[]
+}
+
+model ProductVariant {
+  id         String   @id
+  productId  String
+  sku        String   @unique
+  price      Decimal  @db.Decimal(10, 2)
+  stock      Int      @default(0)
+  attributes Json     @default("{}")
+  imageUrl   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+  Product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model RequiredDocument {
+  id               String             @id
+  name             String
+  type             String
+  url              String
+  customerId       String
+  status           DocumentStatus     @default(PENDING)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
+  CustomerDocument CustomerDocument[]
+  Customer         Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+model Supplier {
+  id            String         @id
+  name          String
+  contactPerson String
+  email         String         @unique
+  phone         String
+  address       Json
+  website       String?
+  logo          String?
+  status        SupplierStatus @default(ACTIVE)
+  category      String
+  subcategory   String?
+  paymentTerms  String
+  documents     String[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime
+  Product       Product[]
+}
+
+model User {
+  id                    String                  @id
+  email                 String                  @unique
+  password              String
+  name                  String
+  role                  UserRole                @default(USER)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime
+  CustomerStatusHistory CustomerStatusHistory[]
+}
+
+enum CustomerStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum DocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+enum ProductStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}

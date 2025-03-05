@@ -1,0 +1,6 @@
+# This file marks the migration as applied, even though we are creating it manually
+# Migration name: 20250303235900_add_supplier_product_variants_bulk_pricing
+# Primary key of "migration_lock": "migration_in_progress"
+
+checksum = "ded58e1dd95ffdf5c8bf1d87cab5b0cd20b7edb1d7e30ac0d14c42ba8c2b1c15"
+applied_steps_count = 1
