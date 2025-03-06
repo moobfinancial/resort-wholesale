@@ -1,116 +1,118 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../../lib/prisma';
 
-interface JwtPayload {
-  id: string;
-  email: string;
-  role: string;
-}
-
+// Define user interface for request
 declare global {
   namespace Express {
     interface Request {
       user?: {
         id: string;
         email: string;
-        role: string;
+        role?: string;
       };
     }
   }
 }
 
+// Middleware to require authentication
 export const requireAuth = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    let token: string | undefined;
-    
-    // Check for token in cookie first (for admin panel)
-    const cookieToken = req.cookies.admin_token;
-    if (cookieToken) {
-      token = cookieToken;
-    } 
-    // Then check for Bearer token (for API clients)
-    else {
-      const authHeader = req.headers.authorization;
-      if (authHeader?.startsWith('Bearer ')) {
-        token = authHeader.split(' ')[1];
-      }
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Authentication required',
+      });
     }
 
+    const token = authHeader.split(' ')[1];
     if (!token) {
-      return res.status(401).json({ message: 'Unauthorized' });
+      return res.status(401).json({
+        status: 'error',
+        message: 'Authentication required',
+      });
     }
 
-    const payload = jwt.verify(
-      token,
-      process.env.JWT_SECRET || 'your-secret-key'
-    ) as JwtPayload;
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as {
+      id: string;
+      email: string;
+      role?: string;
+    };
 
-    // Check if admin
-    if (payload.role === 'admin') {
-      const admin = await prisma.admin.findUnique({
-        where: { id: payload.id },
-        select: { id: true, email: true },
-      });
-
-      if (!admin) {
-        return res.status(401).json({ message: 'Admin not found' });
-      }
-
-      req.user = { ...admin, role: 'admin' };
-    } 
-    // Check if customer (when no role specified, it's a customer token)
-    else if (!payload.role) {
-      const customer = await prisma.Customer.findUnique({
-        where: { id: payload.id },
-        select: { id: true, email: true },
-      });
-
-      if (!customer) {
-        return res.status(401).json({ message: 'Customer not found' });
-      }
-
-      req.user = { ...customer, role: 'customer' };
-    }
-    // Check if regular user (other roles)
-    else {
-      const user = await prisma.user.findUnique({
-        where: { id: payload.id },
-        select: { id: true, email: true, role: true },
-      });
-
-      if (!user) {
-        return res.status(401).json({ message: 'User not found' });
-      }
-
-      req.user = user;
-    }
+    // Set user in request
+    req.user = decoded;
 
     next();
   } catch (error) {
-    console.error('Auth error:', error);
-    res.status(401).json({ message: 'Invalid token' });
+    console.error('Auth middleware error:', error);
+    return res.status(401).json({
+      status: 'error',
+      message: 'Invalid or expired token',
+    });
   }
 };
 
-export const requireAdmin = async (
+// Middleware to optionally authenticate
+export const optionalAuth = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    await requireAuth(req, res, () => {
-      if (req.user?.role !== 'admin') {
-        return res.status(403).json({ message: 'Admin access required' });
-      }
-      next();
-    });
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // No token, continue as guest
+      return next();
+    }
+
+    const token = authHeader.split(' ')[1];
+    if (!token) {
+      // No token, continue as guest
+      return next();
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as {
+      id: string;
+      email: string;
+      role?: string;
+    };
+
+    // Set user in request
+    req.user = decoded;
+
+    next();
   } catch (error) {
-    console.error('Admin auth error:', error);
-    res.status(401).json({ message: 'Invalid token' });
+    // Invalid token, continue as guest
+    console.error('Optional auth middleware error:', error);
+    next();
   }
+};
+
+// Middleware to require admin role
+export const requireAdmin = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  // First require authentication, then check admin role
+  // res is used when passed to requireAuth
+  requireAuth(req, res, () => {
+    // Check if user has admin role
+    if (!req.user || !req.user.role || !['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Admin access required',
+      });
+    }
+
+    next();
+  });
 };

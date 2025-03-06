@@ -1,5 +1,7 @@
 {
   "dependencies": {
+    "@types/stripe": "^8.0.416",
+    "stripe": "^17.7.0",
     "zod": "^3.24.1"
   }
 }

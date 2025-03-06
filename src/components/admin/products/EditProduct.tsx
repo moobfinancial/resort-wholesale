@@ -62,22 +62,9 @@ export default function EditProduct() {
       <div className="mt-8">
         <ProductForm 
           initialValues={selectedProduct} 
-          onSave={async (productData) => {
+          onSave={async (formData) => {
             try {
-              // Convert productData to FormData
-              const formData = new FormData();
-              
-              // Package all the product data as a single JSON string in the 'data' field
-              formData.append('data', JSON.stringify(productData));
-              
-              // If there's an image that isn't a URL (e.g., it's a file or data URL), add it separately
-              if (productData.imageUrl && (productData.imageUrl instanceof File || productData.imageUrl.startsWith('data:'))) {
-                const imageFile = productData.imageUrl instanceof File 
-                  ? productData.imageUrl 
-                  : await fetch(productData.imageUrl).then(r => r.blob());
-                
-                formData.append('image', imageFile, 'product_image.jpg');
-              }
+              console.log('Received FormData from ProductForm');
               
               // Use the update product function from your store
               await updateProduct(id!, formData);

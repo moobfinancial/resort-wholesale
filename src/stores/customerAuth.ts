@@ -2,11 +2,19 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { API_BASE_URL } from '../config';
 
-interface CustomerUser {
+export interface CustomerUser {
   id: string;
   name: string;
   email: string;
   status: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  creditStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  creditLimit?: number;
+  availableCredit?: number;
+  contactName?: string;
+  phone?: string;
+  address?: string;
+  businessType?: string;
+  taxId?: string;
 }
 
 interface CustomerAuthState {
@@ -32,8 +40,7 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
 
       login: async (email: string, password: string) => {
         try {
-          const apiUrl = import.meta.env.VITE_API_URL || '';
-          const response = await fetch(`${apiUrl}/api/customers/login`, {
+          const response = await fetch(`${API_BASE_URL}/customers/login`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -49,9 +56,9 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
 
           const data = await response.json();
           set({
-            token: data.data.token,
+            token: data.token,
             isAuthenticated: true,
-            user: data.data.user,
+            user: data.user,
           });
 
           // Redirect to dashboard after successful login
@@ -64,8 +71,7 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
 
       register: async (data) => {
         try {
-          const apiUrl = import.meta.env.VITE_API_URL || '';
-          const response = await fetch(`${apiUrl}/api/customers/register`, {
+          const response = await fetch(`${API_BASE_URL}/customers/register`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -81,9 +87,9 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
 
           const responseData = await response.json();
           set({
-            token: responseData.data.token,
+            token: responseData.token,
             isAuthenticated: true,
-            user: responseData.data.user,
+            user: responseData.user,
           });
 
           // Redirect to dashboard after successful registration
@@ -97,8 +103,7 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
       updateProfile: async (data) => {
         try {
           const state = useCustomerAuthStore.getState();
-          const apiUrl = import.meta.env.VITE_API_URL || '';
-          const response = await fetch(`${apiUrl}/api/customer/auth/profile`, {
+          const response = await fetch(`${API_BASE_URL}/customer/auth/profile`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',

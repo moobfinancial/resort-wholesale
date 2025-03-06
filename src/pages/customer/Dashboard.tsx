@@ -7,7 +7,8 @@ import {
   Settings, 
   LogOut,
   Home,
-  FileText
+  FileText,
+  DollarSign
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCustomerAuthStore } from '../../stores/customerAuth';
@@ -23,7 +24,9 @@ type TabType =
   | 'payments'
   | 'deliveries'
   | 'payment-methods'
-  | 'settings';
+  | 'settings'
+  | 'credit'
+  | 'documents';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('purchases');
@@ -35,6 +38,7 @@ export default function Dashboard() {
     { id: 'payments', label: 'Payment History', icon: Clock },
     { id: 'deliveries', label: 'Pending Deliveries', icon: Package },
     { id: 'payment-methods', label: 'Payment Methods', icon: CreditCard },
+    { id: 'credit', label: 'Apply for Credit', icon: DollarSign },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -55,6 +59,23 @@ export default function Dashboard() {
         return <PaymentMethods />;
       case 'settings':
         return <SettingsPanel />;
+      case 'credit':
+        return (
+          <div className="text-center py-8">
+            <DollarSign className="h-12 w-12 mx-auto text-blue-500 mb-4" />
+            <h2 className="text-2xl font-bold mb-4">Business Credit Application</h2>
+            <p className="mb-6 text-gray-600 max-w-2xl mx-auto">
+              Apply for a business credit line to make purchases now and pay later. 
+              Our flexible credit terms of 30, 90, or 180 days help you manage cash flow.
+            </p>
+            <button 
+              onClick={() => navigate('/customer/credit/apply')}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg"
+            >
+              Start Application
+            </button>
+          </div>
+        );
       case 'documents':
         return (
           <BusinessVerification

@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useProductStore } from '../stores/frontendProductStore';
+import { useCartStore } from '../stores/cartStore';
 import ProductGrid from '../components/products/ProductGrid';
 import { toast } from 'react-hot-toast';
 import { formatPrice } from '../utils/formatters';
@@ -119,9 +120,20 @@ export default function ProductDetail() {
   };
 
   // Handle add to cart
-  const handleAddToCart = () => {
-    // This will be implemented in a separate step for cart functionality
-    toast.success('Added to cart. Cart functionality coming soon!');
+  const handleAddToCart = async () => {
+    if (!currentProduct) return;
+    
+    try {
+      if (selectedVariant) {
+        await useCartStore().addItem(currentProduct.id, quantity, selectedVariant.id);
+      } else {
+        await useCartStore().addItem(currentProduct.id, quantity);
+      }
+      toast.success('Added to cart successfully!');
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast.error('Failed to add to cart. Please try again.');
+    }
   };
 
   // Render the bulk pricing tiers if available
@@ -179,12 +191,7 @@ export default function ProductDetail() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
         {/* Product Image */}
         <div className="relative">
-          {/* Debug log for image URLs */}
-          {console.log('Product detail image paths:', {
-            variantImageUrl: selectedVariant?.imageUrl,
-            productImageUrl: currentProduct.imageUrl,
-            selectedVariantId: selectedVariant?.id
-          })}
+          {/* Debug log removed to fix TypeScript error */}
           <img
             src={(selectedVariant?.imageUrl || currentProduct.imageUrl || '/images/products/placeholder.svg')}
             alt={currentProduct.name}
@@ -212,8 +219,8 @@ export default function ProductDetail() {
             <span className="text-2xl font-bold text-gray-900">
               ${formatPrice(calculatedPrice || selectedVariant?.price || currentProduct.price)}
             </span>
-            {currentProduct.wholesalePrice && currentProduct.price && typeof currentProduct.wholesalePrice === 'number' && 
-             typeof currentProduct.price === 'number' && currentProduct.wholesalePrice < currentProduct.price && (
+            {/* Display original price if there's a sale price */}
+            {currentProduct.price && calculatedPrice && calculatedPrice < currentProduct.price && (
               <span className="text-lg text-gray-500 line-through">
                 ${formatPrice(currentProduct.price)}
               </span>

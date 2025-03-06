@@ -11,6 +11,8 @@ import InventoryList from '../components/admin/inventory/InventoryList';
 import StockAdjustment from '../components/admin/inventory/StockAdjustment';
 import CollectionManagement from './pages/collections/CollectionManagement';
 import CollectionProducts from './pages/collections/CollectionProducts';
+import CreditApplicationList from '../pages/admin/CreditApplicationList';
+import CreditApplicationDetail from '../pages/admin/CreditApplicationDetail';
 import { RouteErrorBoundary } from '../components/ErrorBoundary';
 
 // Protected route wrapper
@@ -118,6 +120,19 @@ export const adminRoutes: RouteObject[] = [
           {
             path: ':id/edit',
             element: <EditProduct />,
+          },
+        ],
+      },
+      {
+        path: 'credit/applications',
+        children: [
+          {
+            index: true,
+            element: <CreditApplicationList />,
+          },
+          {
+            path: ':id',
+            element: <CreditApplicationDetail />,
           },
         ],
       },

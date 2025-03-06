@@ -31,11 +31,10 @@ export default function Footer() {
           <div className="space-y-4">
             <h3 className="text-white text-lg font-semibold">Quick Links</h3>
             <ul className="space-y-2">
-              <li><a href="#" className="hover:text-white transition">About Us</a></li>
-              <li><a href="#" className="hover:text-white transition">Products</a></li>
-              <li><a href="#" className="hover:text-white transition">Wholesale</a></li>
-              <li><a href="#" className="hover:text-white transition">Contact</a></li>
-              <li><a href="#" className="hover:text-white transition">Blog</a></li>
+              <li><a href="/about" className="hover:text-white transition">About Us</a></li>
+              <li><a href="/products" className="hover:text-white transition">Products</a></li>
+              <li><a href="/wholesale" className="hover:text-white transition">Wholesale</a></li>
+              <li><a href="/contact" className="hover:text-white transition">Contact</a></li>
             </ul>
           </div>
 
@@ -43,11 +42,11 @@ export default function Footer() {
           <div className="space-y-4">
             <h3 className="text-white text-lg font-semibold">Customer Service</h3>
             <ul className="space-y-2">
-              <li><a href="#" className="hover:text-white transition">Shipping Policy</a></li>
-              <li><a href="#" className="hover:text-white transition">Returns & Exchanges</a></li>
-              <li><a href="#" className="hover:text-white transition">FAQ</a></li>
-              <li><a href="#" className="hover:text-white transition">Privacy Policy</a></li>
-              <li><a href="#" className="hover:text-white transition">Terms of Service</a></li>
+              <li><a href="/shipping-policy" className="hover:text-white transition">Shipping Policy</a></li>
+              <li><a href="/returns-and-exchanges" className="hover:text-white transition">Returns & Exchanges</a></li>
+              <li><a href="/faq" className="hover:text-white transition">FAQ</a></li>
+              <li><a href="/terms-and-conditions" className="hover:text-white transition">Terms and Conditions</a></li>
+              <li><a href="/privacy-policy" className="hover:text-white transition">Privacy Policy</a></li>
             </ul>
           </div>
 
@@ -90,12 +89,12 @@ export default function Footer() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="md:flex md:items-center md:justify-between">
             <div className="text-sm">
-              © {new Date().getFullYear()} Resort Accessories. All rights reserved.
+              {new Date().getFullYear()} Resort Accessories. All rights reserved.
             </div>
             <div className="mt-4 md:mt-0">
               <ul className="flex space-x-6 text-sm">
-                <li><a href="#" className="hover:text-white transition">Privacy</a></li>
-                <li><a href="#" className="hover:text-white transition">Terms</a></li>
+                <li><a href="/privacy-policy" className="hover:text-white transition">Privacy Policy</a></li>
+                <li><a href="/terms-and-conditions" className="hover:text-white transition">Terms and Conditions</a></li>
                 <li><a href="#" className="hover:text-white transition">Sitemap</a></li>
               </ul>
             </div>

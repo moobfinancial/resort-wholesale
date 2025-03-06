@@ -12,6 +12,14 @@ import SignIn from './components/auth/SignIn';
 import SignUp from './components/auth/SignUp';
 import Collections, { loader as collectionsLoader } from './pages/Collections';
 import CollectionDetail, { loader as collectionDetailLoader } from './pages/CollectionDetail';
+import ShippingPolicy from './pages/ShippingPolicy';
+import TermsAndConditions from './pages/TermsAndConditions';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import ReturnsAndExchanges from './pages/ReturnsAndExchanges';
+import FAQ from './pages/FAQ';
+import Cart from './pages/Cart';
+import Checkout from './pages/Checkout';
+import OrderConfirmation from './pages/OrderConfirmation';
 
 export const router = createBrowserRouter([
   {
@@ -50,6 +58,22 @@ export const router = createBrowserRouter([
         element: <ContactUs />,
       },
       {
+        path: 'shipping-policy',
+        element: <ShippingPolicy />,
+      },
+      {
+        path: 'terms-and-conditions',
+        element: <TermsAndConditions />,
+      },
+      {
+        path: 'privacy-policy',
+        element: <PrivacyPolicy />,
+      },
+      {
+        path: 'returns-and-exchanges',
+        element: <ReturnsAndExchanges />,
+      },
+      {
         path: 'login',
         element: <SignIn onClose={() => {}} onSignIn={() => {}} />,
       },
@@ -66,6 +90,22 @@ export const router = createBrowserRouter([
         path: 'collections/:id',
         element: <CollectionDetail />,
         loader: collectionDetailLoader,
+      },
+      {
+        path: 'faq',
+        element: <FAQ />,
+      },
+      {
+        path: 'cart',
+        element: <Cart />,
+      },
+      {
+        path: 'checkout',
+        element: <Checkout />,
+      },
+      {
+        path: 'order/confirmation/:orderNumber',
+        element: <OrderConfirmation />,
       },
     ],
   },

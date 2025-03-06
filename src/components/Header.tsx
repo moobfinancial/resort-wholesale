@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useCustomerAuthStore } from '../stores/customerAuth';
 import AuthModal from './auth/AuthModal';
+import CartIcon from './cart/CartIcon';
 
 export default function Header() {
   const { isAuthenticated, logout } = useCustomerAuthStore();
@@ -20,9 +21,9 @@ export default function Header() {
             {/* Logo */}
             <Link to="/" className="flex-shrink-0 flex items-center">
               <img
-                className="h-8 w-auto"
-                src="/logo.svg"
-                alt="Resort Wholesale"
+                className="h-20 w-auto"
+                src="/images/brand/logo1.png"
+                alt="Resort Accessories"
               />
             </Link>
 
@@ -64,7 +65,11 @@ export default function Header() {
           </div>
 
           {/* Right side navigation */}
-          <div className="flex items-center">
+          <div className="flex items-center space-x-6">
+            {/* Cart Icon */}
+            <CartIcon />
+            
+            {/* Authentication */}
             {isAuthenticated ? (
               <div className="flex items-center space-x-4">
                 <Link

@@ -1,5 +1,6 @@
 import React from 'react';
 import CustomerDashboard from '../pages/customer/Dashboard';
+import CreditApplication from '../pages/customer/CreditApplication';
 import { RequireCustomerAuth } from '../components/auth/RequireAuth';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 
@@ -16,7 +17,14 @@ export const customerRoutes = [
           </ErrorBoundary>
         ),
       },
-      // Add more customer routes here
+      {
+        path: 'credit/apply',
+        element: (
+          <ErrorBoundary>
+            <CreditApplication />
+          </ErrorBoundary>
+        ),
+      },
     ],
   },
 ];

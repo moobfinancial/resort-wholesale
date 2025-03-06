@@ -11,43 +11,14 @@ export default function NewProduct() {
   const navigate = useNavigate();
   const { createProduct, loading } = useProductStore();
 
-  const handleSubmit = async (productData: Partial<Product>) => {
+  const handleSubmit = async (formData: FormData) => {
     setSubmitting(true);
     setError(null);
     
     try {
-      const formData = new FormData();
+      console.log('Received FormData from ProductForm');
       
-      // Create a clean JSON object without any undefined values
-      const jsonData: Record<string, any> = {
-        ...productData,
-        isFeatured: productData.isFeatured || productData.featured,
-        featured: undefined
-      };
-      
-      // Handle image file
-      if (productData.imageUrl && typeof productData.imageUrl === 'object') {
-        formData.append('image', productData.imageUrl, productData.imageUrl.name || 'product_image.jpg');
-        console.log('Appending image file to form data:', productData.imageUrl.name || 'product_image.jpg');
-        
-        // When sending image as a file, remove imageUrl from JSON data
-        delete jsonData.imageUrl;
-      } 
-      // Handle image URL (could be base64 or path)
-      else if (productData.imageUrl) {
-        console.log('Using imageUrl from form:', typeof productData.imageUrl);
-        // If it's a relative path, ensure it's properly formatted
-        if (typeof productData.imageUrl === 'string' && !productData.imageUrl.startsWith('data:') && !productData.imageUrl.startsWith('/')) {
-          jsonData.imageUrl = `/images/products/${productData.imageUrl}`;
-        }
-      }
-      
-      formData.append('data', JSON.stringify(jsonData));
-      
-      console.log('Submitting new product with data:', {
-        ...jsonData,
-        imageUrl: jsonData.imageUrl ? (typeof jsonData.imageUrl === 'string' && jsonData.imageUrl.length > 100 ? 'base64 image data' : jsonData.imageUrl) : 'No image URL'
-      });
+      console.log('Submitting new product with FormData');
       
       // Use the create product function from the store
       await createProduct(formData);

@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useLoaderData, useParams, Link } from 'react-router-dom';
-import { Product } from '../types/index';
+import { Product } from '../types/product';
 import { formatPrice } from '../utils/formatters';
 
-interface CollectionDetailProps {
-  products: Product[];
-}
-
-const CollectionDetail: React.FC<CollectionDetailProps> = () => {
+const CollectionDetail: React.FC = () => {
   const { id } = useParams();
   const products = useLoaderData() as Product[];
   const [collectionName, setCollectionName] = useState<string>('Collection');

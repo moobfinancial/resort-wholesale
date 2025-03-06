@@ -11,7 +11,8 @@ import {
   LogOut,
   ShoppingBasket,
   Truck,
-  Grid
+  Grid,
+  CreditCard
 } from 'lucide-react';
 import { useAdminAuthStore } from '../../stores/adminAuth';
 
@@ -22,6 +23,7 @@ const navigation = [
   { name: 'Inventory', href: '/admin/inventory', icon: Package },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingBag },
   { name: 'Customers', href: '/admin/customers', icon: Users },
+  { name: 'Credit Applications', href: '/admin/credit/applications', icon: CreditCard },
   { name: 'Suppliers', href: '/admin/suppliers', icon: Truck },
   { name: 'Settings', href: '/admin/settings', icon: Settings },
 ];
@@ -74,8 +76,8 @@ export default function AdminLayout() {
                 <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white px-6 pb-4">
                   <div className="flex h-16 shrink-0 items-center">
                     <img
-                      className="h-8 w-auto"
-                      src="/logo.svg"
+                      className="h-24 w-auto"
+                      src="/images/brand/logo1.png"
                       alt="Resort Admin"
                     />
                   </div>
@@ -133,8 +135,8 @@ export default function AdminLayout() {
         <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4">
           <div className="flex h-16 shrink-0 items-center">
             <img
-              className="h-8 w-auto"
-              src="/logo.svg"
+              className="h-24 w-auto"
+              src="/images/brand/logo1.png"
               alt="Resort Admin"
             />
           </div>

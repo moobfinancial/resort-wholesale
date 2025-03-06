@@ -7,7 +7,8 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import fs from 'fs';
 import debug from 'debug';
-import { prisma } from '../lib/prisma'; // Import prisma client directly
+// Prisma client is imported by route handlers, but not used directly in this file
+// import { prisma } from '../lib/prisma';
 import authRoutes from './routes/auth';
 import customerAuthRoutes from './routes/customerAuth';
 import customerRoutes from './routes/customers';
@@ -18,6 +19,8 @@ import productVariantRoutes from './routes/productVariants';
 import bulkPricingRoutes from './routes/bulkPricing';
 import orderRoutes from './routes/orders';
 import documentRoutes from './routes/documents';
+import cartRoutes from './routes/cart';
+import creditApplicationRoutes from './routes/creditApplications';
 import { productService } from './services/productService';
 import adminRoutes from './routes/admin';
 import businessCustomerRoutes from './routes/business-customers';
@@ -101,6 +104,7 @@ app.use('/api/business-customers', businessCustomerRoutes);
 app.use('/api/suppliers', suppliersRouter);
 app.use('/api/suppliers', supplierOrdersRouter);
 app.use('/api/collections', collectionsRouter);
+app.use('/api/cart', cartRoutes);
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
@@ -141,6 +145,7 @@ app.use('/api/customer/auth', customerAuthRoutes);
 console.log('Registered customer auth routes');
 app.use('/api', orderRoutes); // Mount at /api to support /api/customer/orders
 app.use('/api', documentRoutes); // Mount at /api to support /api/customer/documents
+app.use('/api', creditApplicationRoutes); // Mount at /api to support /api/credit-applications
 
 // Test DB connection
 app.get('/api/products/test-db', async (_req, res) => {

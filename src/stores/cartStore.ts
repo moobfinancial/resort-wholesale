@@ -1,93 +1,188 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+import { persist } from 'zustand/middleware';
+import { API_BASE_URL } from '../config';
+import { Product, ProductVariant } from '../types/product';
 
-interface CartProduct {
+export interface CartItem {
   id: string;
-  name: string;
-  retail_price: number;
-  wholesale_price: number;
-  images: string[];
-  min_wholesale_qty: number;
-}
-
-interface CartItem {
-  id: string;
-  product_id: string;
+  productId: string;
+  variantId?: string;
   quantity: number;
-  product: CartProduct;
+  product: Product;
+  variant?: ProductVariant;
 }
 
-interface CartState {
+export interface CartState {
   items: CartItem[];
   loading: boolean;
-  addItem: (productId: string, quantity: number) => Promise<void>;
+  error: string | null;
+  
+  // Actions
+  addItem: (productId: string, quantity: number, variantId?: string) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
   updateQuantity: (itemId: string, quantity: number) => Promise<void>;
   loadCart: () => Promise<void>;
   clearCart: () => Promise<void>;
+  getCartTotal: () => number;
+  getCartItemCount: () => number;
 }
 
-export const useCartStore = create<CartState>((set, get) => ({
-  items: [],
-  loading: true,
+export const useCartStore = create<CartState>()(
+  persist(
+    (set, get) => ({
+      items: [],
+      loading: false,
+      error: null,
 
-  addItem: async (productId: string, quantity: number) => {
-    const { error } = await supabase
-      .from('cart_items')
-      .insert({ product_id: productId, quantity });
+      addItem: async (productId: string, quantity: number, variantId?: string) => {
+        set({ loading: true, error: null });
+        try {
+          const response = await fetch(`${API_BASE_URL}/cart/items`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ productId, quantity, variantId }),
+          });
 
-    if (error) throw error;
-    await get().loadCart();
-  },
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to add item to cart');
+          }
 
-  removeItem: async (itemId: string) => {
-    const { error } = await supabase
-      .from('cart_items')
-      .delete()
-      .eq('id', itemId);
+          await get().loadCart();
+        } catch (error) {
+          console.error('Add to cart error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to add item to cart',
+            loading: false 
+          });
+        }
+      },
 
-    if (error) throw error;
-    await get().loadCart();
-  },
+      removeItem: async (itemId: string) => {
+        set({ loading: true, error: null });
+        try {
+          const response = await fetch(`${API_BASE_URL}/cart/items/${itemId}`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+          });
 
-  updateQuantity: async (itemId: string, quantity: number) => {
-    const { error } = await supabase
-      .from('cart_items')
-      .update({ quantity })
-      .eq('id', itemId);
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to remove item from cart');
+          }
 
-    if (error) throw error;
-    await get().loadCart();
-  },
+          await get().loadCart();
+        } catch (error) {
+          console.error('Remove from cart error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to remove item from cart',
+            loading: false 
+          });
+        }
+      },
 
-  loadCart: async () => {
-    const { data, error } = await supabase
-      .from('cart_items')
-      .select(`
-        id,
-        product_id,
-        quantity,
-        product:products (
-          id,
-          name,
-          retail_price,
-          wholesale_price,
-          images,
-          min_wholesale_qty
-        )
-      `);
+      updateQuantity: async (itemId: string, quantity: number) => {
+        set({ loading: true, error: null });
+        try {
+          const response = await fetch(`${API_BASE_URL}/cart/items/${itemId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ quantity }),
+          });
 
-    if (error) throw error;
-    set({ items: data || [], loading: false });
-  },
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to update cart item');
+          }
 
-  clearCart: async () => {
-    const { error } = await supabase
-      .from('cart_items')
-      .delete()
-      .neq('id', '');
+          await get().loadCart();
+        } catch (error) {
+          console.error('Update cart error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to update cart item',
+            loading: false 
+          });
+        }
+      },
 
-    if (error) throw error;
-    set({ items: [] });
-  },
-}));
+      loadCart: async () => {
+        set({ loading: true, error: null });
+        try {
+          const response = await fetch(`${API_BASE_URL}/cart`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to load cart');
+          }
+
+          const data = await response.json();
+          set({ 
+            items: data.items || [], 
+            loading: false 
+          });
+        } catch (error) {
+          console.error('Load cart error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to load cart',
+            loading: false 
+          });
+        }
+      },
+
+      clearCart: async () => {
+        set({ loading: true, error: null });
+        try {
+          const response = await fetch(`${API_BASE_URL}/cart/clear`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to clear cart');
+          }
+
+          set({ items: [], loading: false });
+        } catch (error) {
+          console.error('Clear cart error:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to clear cart',
+            loading: false 
+          });
+        }
+      },
+
+      getCartTotal: () => {
+        return get().items.reduce((total, item) => {
+          const price = item.variant?.price || item.product.price;
+          return total + (price * item.quantity);
+        }, 0);
+      },
+
+      getCartItemCount: () => {
+        return get().items.reduce((count, item) => count + item.quantity, 0);
+      },
+    }),
+    {
+      name: 'cart-storage',
+    }
+  )
+);

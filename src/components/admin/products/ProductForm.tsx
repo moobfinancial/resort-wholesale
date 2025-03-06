@@ -9,22 +9,12 @@ import ProductCapture from './ProductCapture';
 import useImageAnalysis from '../../../hooks/useImageAnalysis';
 import { api } from '../../../lib/api';
 
-// Define the ImageAnalysisResult interface if it's not already defined
-interface ImageAnalysisResult {
-  name?: string;
-  productName?: string;
-  sku: string;
-  category?: string;
-  description?: string;
-  suggestedTags?: string[];
-  tags?: string[];
-  imageUrl?: string;
-  features?: string[];
-}
+// Import the ImageAnalysisResult interface from the hook
+import { ImageAnalysisResult } from '../../../hooks/useImageAnalysis';
 
 interface ProductFormProps {
   initialValues?: Partial<Product>;
-  onSave: (product: Partial<Product>) => Promise<void>;
+  onSave: (product: any) => Promise<void>;
   isSubmitting?: boolean;
   isEdit?: boolean;
 }
@@ -116,39 +106,63 @@ export default function ProductForm({ initialValues, onSave, isSubmitting = fals
     }
   };
 
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async () => {
     setFormSubmitting(true);
 
     try {
-      console.log('FileList at submission time:', fileList);
+      const formData = new FormData();
       
-      // Prepare the product data
-      const productData: Partial<Product> = {
-        ...values,
-        tags: values.tags ? values.tags.split(',').map((tag: string) => tag.trim()) : [],
-      };
+      // Append other form fields
+      const values = await form.validateFields();
       
-      // Handle image URL
-      let imageUrl = values.imageUrl;
-      
-      // If we have a file in the fileList, use that
-      if (fileList.length > 0 && fileList[0].originFileObj) {
-        // We'll send the file directly, so don't set imageUrl
-        productData.imageFile = fileList[0].originFileObj;
-        console.log('Using file object for image upload');
-      } 
-      // Otherwise use the image URL from the form
-      else if (imageUrl) {
-        // If it's a relative path without leading slash, ensure it has the correct format
-        if (typeof imageUrl === 'string' && !imageUrl.startsWith('data:') && !imageUrl.startsWith('/')) {
-          imageUrl = `/images/products/${imageUrl}`;
-        }
-        productData.imageUrl = imageUrl;
-        console.log('Using image URL:', imageUrl);
+      // Convert tags from comma-separated string to array
+      if (values.tags && typeof values.tags === 'string') {
+        values.tags = values.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag);
       }
       
-      // Submit the form
-      await onSave(productData);
+      // Convert price and stock to numbers
+      if (values.price) {
+        values.price = Number(values.price);
+      }
+      
+      if (values.stock) {
+        values.stock = Number(values.stock);
+      }
+      
+      if (values.minOrder) {
+        values.minOrder = Number(values.minOrder);
+      }
+      
+      // Create a JSON string of the product data
+      // Make sure to convert values to a plain object first to avoid circular references
+      const productDataObj = { ...values };
+      const productDataJson = JSON.stringify(productDataObj);
+      formData.append('data', productDataJson);
+      
+      // Log the form data for debugging
+      console.log('Form data prepared:', {
+        productData: productDataObj,
+        hasImage: fileList.length > 0 && !!fileList[0].originFileObj
+      });
+      
+      // Append files from fileList
+      if (fileList.length > 0 && fileList[0].originFileObj) {
+        formData.append('image', fileList[0].originFileObj as Blob);
+      } else if (fileList.length > 0 && fileList[0].url) {
+        // If we have a URL but no originFileObj, we need to handle it differently
+        // Store the URL in the form data
+        const imageUrl = fileList[0].url;
+        if (imageUrl && !productDataObj.imageUrl) {
+          productDataObj.imageUrl = imageUrl;
+          // Update the data field with the new productDataObj that includes imageUrl
+          formData.set('data', JSON.stringify(productDataObj));
+        }
+      }
+      
+      console.log('Submitting form with data:', values);
+
+      // Call the onSave function with the constructed formData
+      await onSave(formData);
 
       message.success(`Product ${initialValues ? 'updated' : 'created'} successfully!`);
 
@@ -165,8 +179,9 @@ export default function ProductForm({ initialValues, onSave, isSubmitting = fals
     }
   };
 
-  const handleBulkPricingUpdate = async (updatedTiers: BulkPricing[]) => {
-    setBulkPricing(updatedTiers);
+  const handleBulkPricingUpdate = async (updatedTiers: any[]) => {
+    // Cast to BulkPricing[] for state update
+    setBulkPricing(updatedTiers as BulkPricing[]);
 
     if (initialValues?.id) {
       try {
@@ -191,12 +206,12 @@ export default function ProductForm({ initialValues, onSave, isSubmitting = fals
         throw new Error('No analysis data received');
       }
       
-      // Handle tags from either suggestedTags or tags property
-      const tagsArray = analysis.suggestedTags || analysis.tags || [];
+      // Handle tags from suggestedTags property
+      const tagsArray = analysis.suggestedTags || [];
       const tagsString = Array.isArray(tagsArray) ? tagsArray.join(', ') : '';
       
       form.setFieldsValue({
-        name: analysis.name || analysis.productName || form.getFieldValue('name'),
+        name: analysis.name || form.getFieldValue('name'),
         sku: analysis.sku || form.getFieldValue('sku'),
         category: analysis.category,
         description: analysis.description,
@@ -301,42 +316,6 @@ export default function ProductForm({ initialValues, onSave, isSubmitting = fals
             tags: initialValues?.tags?.join(',') || '',
           }}
         >
-          <Form.Item name="name" label="Product Name" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-
-          <Form.Item name="sku" label="SKU" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-
-          <Form.Item name="category" label="Category" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-
-          <Form.Item name="description" label="Description" rules={[{ required: true }]}>
-            <Input.TextArea rows={4} />
-          </Form.Item>
-
-          <Form.Item name="price" label="Price" rules={[{ required: true, type: 'number', min: 0 }]}>
-            <InputNumber min={0} step={0.01} prefix="$" style={{ width: '100%' }} />
-          </Form.Item>
-
-          <Form.Item name="stock" label="Stock Level" rules={[{ required: true, type: 'number', min: 0 }]}>
-            <InputNumber min={0} style={{ width: '100%' }} />
-          </Form.Item>
-
-          <Form.Item name="minOrder" label="Minimum Stock Alert Level">
-            <InputNumber min={0} style={{ width: '100%' }} />
-          </Form.Item>
-
-          <Form.Item name="tags" label="Tags">
-            <Input placeholder="Enter tags separated by commas" />
-          </Form.Item>
-
-          <Form.Item name="featured" label="Featured Product" valuePropName="checked">
-            <Switch />
-          </Form.Item>
-
           <Form.Item name="imageUrl" label="Product Image">
             <div style={{ marginBottom: '15px' }}>
               <Typography.Text>
@@ -373,6 +352,42 @@ export default function ProductForm({ initialValues, onSave, isSubmitting = fals
                 Capture Photo
               </Button>
             </div>
+          </Form.Item>
+
+          <Form.Item name="name" label="Product Name" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="sku" label="SKU" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="category" label="Category" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="description" label="Description" rules={[{ required: true }]}>
+            <Input.TextArea rows={4} />
+          </Form.Item>
+
+          <Form.Item name="price" label="Price" rules={[{ required: true, type: 'number', min: 0 }]}>
+            <InputNumber min={0} step={0.01} prefix="$" style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item name="stock" label="Stock Level" rules={[{ required: true, type: 'number', min: 0 }]}>
+            <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item name="minOrder" label="Minimum Stock Alert Level">
+            <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item name="tags" label="Tags">
+            <Input placeholder="Enter tags separated by commas" />
+          </Form.Item>
+
+          <Form.Item name="featured" label="Featured Product" valuePropName="checked">
+            <Switch />
           </Form.Item>
 
           <Form.Item>

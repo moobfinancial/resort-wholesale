@@ -199,12 +199,15 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
           console.log('Gemini API response:', text);
           
           // Parse the response
-          const lines = text.split('\n').filter(line => line.trim() !== '');
+          const lines = text.split('\n').filter((line: string) => line.trim() !== '');
           
-          const name = lines.find(l => l.startsWith('Name:'))?.replace('Name:', '').trim() || path.parse(req.file.originalname).name.replace(/[-_]/g, ' ');
-          const category = lines.find(l => l.startsWith('Category:'))?.replace('Category:', '').trim() || 'Other';
-          const description = lines.find(l => l.startsWith('Description:'))?.replace('Description:', '').trim() || '';
-          const tags = lines.find(l => l.startsWith('Tags:'))?.replace('Tags:', '').trim().split(',').map(t => t.trim()) || [];
+          // Ensure req.file is defined (we already checked this above)
+          const fileName = req.file ? req.file.originalname : 'unknown';
+          
+          const name = lines.find((l: string) => l.startsWith('Name:'))?.replace('Name:', '').trim() || path.parse(fileName).name.replace(/[-_]/g, ' ');
+          const category = lines.find((l: string) => l.startsWith('Category:'))?.replace('Category:', '').trim() || 'Other';
+          const description = lines.find((l: string) => l.startsWith('Description:'))?.replace('Description:', '').trim() || '';
+          const tags = lines.find((l: string) => l.startsWith('Tags:'))?.replace('Tags:', '').trim().split(',').map((t: string) => t.trim()) || [];
 
           const sku = generateSku(name, category);
           
@@ -213,7 +216,9 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
             sku,
             category,
             description,
-            suggestedTags: tags
+            suggestedTags: tags,
+            imageUrl: '', // Add imageUrl property with empty string
+            features: [] // Add features property with empty array
           };
         } catch (innerError) {
           console.error('Error in Gemini API call:', innerError);
@@ -225,26 +230,26 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
       const filename = `${Date.now()}-${path.basename(req.file.originalname)}`;
       
       // Ensure directories exist
-      const uploadDir = path.join(process.cwd(), 'uploads', 'products');
-      const publicDir = path.join(process.cwd(), 'public', 'uploads', 'products');
+      const uploadsProductsDir = path.join(process.cwd(), 'uploads', 'products');
+      const publicUploadsDir = path.join(process.cwd(), 'public', 'uploads', 'products');
       
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-        console.log(`Created upload directory: ${uploadDir}`);
+      if (!fs.existsSync(uploadsProductsDir)) {
+        fs.mkdirSync(uploadsProductsDir, { recursive: true });
+        console.log(`Created upload directory: ${uploadsProductsDir}`);
       }
       
-      if (!fs.existsSync(publicDir)) {
-        fs.mkdirSync(publicDir, { recursive: true });
-        console.log(`Created public directory: ${publicDir}`);
+      if (!fs.existsSync(publicUploadsDir)) {
+        fs.mkdirSync(publicUploadsDir, { recursive: true });
+        console.log(`Created public directory: ${publicUploadsDir}`);
       }
       
-      const uploadPath = path.join(uploadDir, filename);
+      const uploadPath = path.join(uploadsProductsDir, filename);
       
       await fs.promises.copyFile(imagePath, uploadPath);
       console.log(`Image saved to ${uploadPath}`);
       
       // Also copy to public directory for frontend access
-      const publicPath = path.join(publicDir, filename);
+      const publicPath = path.join(publicUploadsDir, filename);
       await fs.promises.copyFile(imagePath, publicPath);
       console.log(`Image copied to public directory: ${publicPath}`);
       
@@ -283,8 +288,8 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
         console.log(`Image saved to ${uploadDir} despite analysis failure`);
         
         // Also copy to public directory for frontend access
-        await fs.promises.copyFile(imagePath, path.join(publicDir, filename));
-        console.log(`Image copied to public directory: ${publicDir}`);
+        await fs.promises.copyFile(imagePath, path.join(publicImagesDir, filename));
+        console.log(`Image copied to public directory: ${publicImagesDir}`);
         
         // Return default values with image URL
         return res.json({
@@ -341,10 +346,30 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
 router.post('/products', upload.single('image'), async (req, res) => {
   try {
     let productData;
+    
+    // Log the received data for debugging
+    console.log('Received form data:', req.body);
+    console.log('Received file:', req.file);
+    
     try {
+      // Check if data field exists
+      if (!req.body.data) {
+        console.error('No data field found in request body');
+        return res.status(400).json({
+          status: 'error',
+          message: 'Missing product data'
+        });
+      }
+      
+      // Parse the JSON data from the 'data' field
       productData = JSON.parse(req.body.data);
+      console.log('Parsed product data:', productData);
     } catch (error) {
-      throw new Error('Invalid product data');
+      console.error('Error parsing product data:', error);
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid product data format'
+      });
     }
 
     // Check if there's an image file in the request
@@ -367,12 +392,20 @@ router.post('/products', upload.single('image'), async (req, res) => {
       
       // Save the image to the uploads directory
       const uploadPath = path.join(uploadDir, filename);
-      await fs.promises.writeFile(uploadPath, req.file.buffer);
+      
+      // Check if req.file has buffer or path
+      if (req.file.buffer) {
+        await fs.promises.writeFile(uploadPath, req.file.buffer);
+      } else if (req.file.path) {
+        await fs.promises.copyFile(req.file.path, uploadPath);
+      } else {
+        throw new Error('No file data available');
+      }
       console.log(`Image saved to ${uploadPath}`);
       
       // Also copy to public directory for frontend access
       const publicPath = path.join(publicDir, filename);
-      await fs.promises.writeFile(publicPath, req.file.buffer);
+      await fs.promises.copyFile(uploadPath, publicPath);
       console.log(`Image copied to public directory: ${publicPath}`);
       
       // Set the image URL in the product data
@@ -637,14 +670,14 @@ router.delete('/products/:id', async (req, res) => {
 router.get('/products', async (req, res) => {
   try {
     const { category, search, page = 1, limit = 10 } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
+    const pageNum = Number(page);
+    const limitNum = Number(limit);
 
     const result = await productService.listProducts({
-      skip,
-      take,
-      category: category?.toString(),
-      search: search?.toString()
+      page: pageNum,
+      limit: limitNum,
+      where: category ? { category: category.toString() } : undefined,
+      orderBy: { createdAt: 'desc' }
     });
 
     res.json({
@@ -695,14 +728,19 @@ router.get('/api/products', async (req, res) => {
     const order = req.query.order as string || 'desc';
     const search = req.query.search as string || '';
     
-    const options = {
+    // Use listProducts with the correct parameters
+    const result = await productService.listProducts({
       page,
-      limit, 
-      search,
+      limit,
+      where: search ? {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+          { tags: { has: search } }
+        ]
+      } : undefined,
       orderBy: { [sort]: order },
-    };
-      
-    const result = await productService.getProducts(options);
+    });
       
     res.json(result);
   } catch (error) {
