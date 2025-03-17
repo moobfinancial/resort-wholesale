@@ -38,6 +38,7 @@ interface Collection {
   createdAt: string;
   updatedAt: string;
   productCount?: number;
+  products?: any[];
 }
 
 const CollectionManagement: React.FC = () => {
@@ -56,27 +57,20 @@ const CollectionManagement: React.FC = () => {
   const fetchCollections = async () => {
     try {
       setLoading(true);
-      // Use the API_BASE_URL from config or fallback to the environment variable
-      const apiUrl = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${apiUrl}/api/collections`);
+      const response = await api.get('/collections');
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      const { data } = response;
       
-      const data = await response.json();
-      
-      if (data && data.status === 'success') {
-        if (Array.isArray(data.data)) {
-          setCollections(data.data);
-        } else if (data.data && Array.isArray(data.data.collections)) {
-          setCollections(data.data.collections);
-        } else {
-          console.warn('Unexpected data structure:', data);
-          setCollections([]);
-        }
+      if (data && data.status === 'success' && data.data) {
+        const collections = data.data.collections || [];
+        const processedCollections = collections.map((collection: Collection) => ({
+          ...collection,
+          imageUrl: processImageUrl(collection.imageUrl),
+          productCount: collection.products?.length || 0
+        }));
+        setCollections(processedCollections);
       } else {
-        throw new Error(data.message || 'Failed to fetch collections');
+        throw new Error(data?.message || 'Failed to list collections');
       }
     } catch (error) {
       console.error('Failed to fetch collections:', error);
@@ -85,6 +79,32 @@ const CollectionManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const processImageUrl = (imageUrl: string | null | undefined): string => {
+    if (!imageUrl) {
+      return '/images/collections/collection-1741193035768-61315048.jpg'; // Default placeholder
+    }
+    
+    // If URL is already properly formatted, return it
+    if (imageUrl.startsWith('/images/collections/') || imageUrl.startsWith('http')) {
+      return imageUrl;
+    }
+    
+    // Handle paths starting with /images/categories/ (old format)
+    if (imageUrl.startsWith('/images/categories/') || imageUrl.startsWith('images/categories/')) {
+      const filename = imageUrl.split('/').pop();
+      return `/images/collections/${filename}`;
+    }
+    
+    // If URL is just a filename or path without proper prefix
+    if (imageUrl.startsWith('images/collections/')) {
+      return '/' + imageUrl;
+    }
+    
+    // Extract filename and add proper prefix
+    const filename = imageUrl.split('/').pop();
+    return `/images/collections/${filename}`;
   };
 
   const handleAddEdit = async (values: any) => {
@@ -102,20 +122,28 @@ const CollectionManagement: React.FC = () => {
 
       let response;
       if (editingCollection) {
-        response = await api.put(`/api/collections/${editingCollection.id}`, formData, {
+        // Update existing collection
+        response = await api.put(`/collections/${editingCollection.id}`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
-        message.success('Collection updated successfully');
+        if (response.data?.status === 'success') {
+          message.success('Collection updated successfully');
+        } else {
+          throw new Error(response.data?.message || 'Failed to update collection');
+        }
       } else {
-        response = await api.post('/api/collections', formData, {
+        // Create new collection
+        response = await api.post('/collections', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
-        message.success('Collection created successfully');
+        if (response.data?.status === 'success') {
+          message.success('Collection created successfully');
+        } else {
+          throw new Error(response.data?.message || 'Failed to create collection');
+        }
       }
 
-      // Immediately fetch the updated collection list
       await fetchCollections();
-
       setModalVisible(false);
       form.resetFields();
       setImageFile([]);
@@ -127,9 +155,13 @@ const CollectionManagement: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      await api.delete(`/api/collections/${id}`);
-      message.success('Collection deleted successfully');
-      fetchCollections();
+      const response = await api.delete(`/collections/${id}`);
+      if (response.data?.status === 'success') {
+        message.success('Collection deleted successfully');
+        fetchCollections();
+      } else {
+        throw new Error(response.data?.message || 'Failed to delete collection');
+      }
     } catch (error) {
       console.error('Failed to delete collection:', error);
       message.error('Failed to delete collection');
@@ -147,12 +179,14 @@ const CollectionManagement: React.FC = () => {
       });
       
       if (collection.imageUrl) {
+        // Process the image URL to ensure it's properly formatted
+        const processedImageUrl = processImageUrl(collection.imageUrl);
         setImageFile([
           {
             uid: '-1',
-            name: 'image.png',
+            name: 'collection-image.jpg',
             status: 'done',
-            url: collection.imageUrl,
+            url: processedImageUrl,
           },
         ]);
       } else {
@@ -172,18 +206,23 @@ const CollectionManagement: React.FC = () => {
       dataIndex: 'imageUrl',
       key: 'imageUrl',
       render: (imageUrl: string) => (
-        imageUrl ? (
-          <Image
-            src={imageUrl}
-            alt="Collection"
-            style={{ width: 50, height: 50, objectFit: 'cover' }}
-            preview={false}
-          />
-        ) : (
-          <div style={{ width: 50, height: 50, background: '#f0f0f0', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            No Image
-          </div>
-        )
+        <Image
+          src={imageUrl}
+          alt="Collection"
+          style={{ width: 50, height: 50, objectFit: 'cover' }}
+          preview={false}
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            // Try with collections path
+            if (!target.src.includes('/images/collections/')) {
+              const filename = imageUrl.split('/').pop();
+              target.src = `/images/collections/${filename || 'collection-1741193035768-61315048.jpg'}`;
+            } else {
+              // Fallback to placeholder
+              target.src = '/images/collections/collection-1741193035768-61315048.jpg';
+            }
+          }}
+        />
       ),
     },
     {
@@ -321,6 +360,11 @@ const CollectionManagement: React.FC = () => {
                 onChange={({ fileList }) => setImageFile(fileList)}
                 beforeUpload={() => false}
                 maxCount={1}
+                onPreview={() => {
+                  if (imageFile.length > 0 && imageFile[0].url) {
+                    window.open(imageFile[0].url);
+                  }
+                }}
               >
                 {imageFile.length === 0 && (
                   <div>
@@ -329,6 +373,9 @@ const CollectionManagement: React.FC = () => {
                   </div>
                 )}
               </Upload>
+              <div className="text-xs text-gray-500 mt-1">
+                Recommended size: 600x400 pixels. JPG, PNG, or GIF format.
+              </div>
             </Form.Item>
 
             <Form.Item className="mb-0 text-right">

@@ -1,4 +1,4 @@
-import express, { Router } from 'express';
+import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth';
 import { productVariantService } from '../services/productVariantService';
@@ -28,24 +28,57 @@ router.get('/:productId/variants', async (req, res) => {
     if (!product) {
       return res.status(404).json({ 
         status: 'error',
-        message: 'Product not found',
-        variants: [] 
+        message: 'Product not found'
       });
     }
     
     const variants = await productVariantService.getByProductId(productId);
     
-    // Always return a successful response with variants (even if empty)
+    // Process variant images to ensure consistent paths
+    const processedVariants = variants.map(variant => {
+      let imageUrl = variant.imageUrl;
+      
+      // Process image URL for consistency
+      if (imageUrl) {
+        // If imageUrl is just a filename or doesn't have the proper prefix
+        if (!imageUrl.startsWith('/images/products/') && !imageUrl.startsWith('http')) {
+          // If it's a relative path starting with images/ but missing the leading slash
+          if (imageUrl.startsWith('images/products/')) {
+            imageUrl = '/' + imageUrl;
+          } else if (imageUrl.startsWith('/uploads/products/') || 
+                    imageUrl.startsWith('uploads/products/')) {
+            // Handle old path format
+            const filename = imageUrl.split('/').pop();
+            imageUrl = `/images/products/${filename || 'placeholder.svg'}`;
+          } else {
+            // Extract just the filename if it's a path
+            const filename = imageUrl.split('/').pop();
+            imageUrl = `/images/products/${filename || 'placeholder.svg'}`;
+          }
+        }
+      } else {
+        // Set default placeholder if no image
+        imageUrl = '/images/products/placeholder.svg';
+      }
+      
+      return {
+        ...variant,
+        imageUrl
+      };
+    });
+    
+    // Return response following the standard format
     return res.status(200).json({ 
       status: 'success',
-      variants 
+      data: {
+        items: processedVariants
+      }
     });
   } catch (error) {
     console.error('Error fetching product variants:', error);
-    // Return empty array instead of error for better frontend experience
-    return res.status(200).json({ 
-      status: 'success',
-      variants: [] 
+    return res.status(500).json({ 
+      status: 'error',
+      message: 'Failed to fetch product variants'
     });
   }
 });
@@ -57,13 +90,49 @@ router.get('/:productId/variants/:variantId', async (req, res) => {
     const variant = await productVariantService.getById(variantId);
     
     if (!variant) {
-      return res.status(404).json({ error: 'Product variant not found' });
+      return res.status(404).json({ 
+        status: 'error',
+        message: 'Variant not found' 
+      });
     }
     
-    return res.status(200).json(variant);
+    // Process image URL for consistency
+    let processedVariant = { ...variant };
+    if (processedVariant.imageUrl) {
+      // If imageUrl is just a filename or doesn't have the proper prefix
+      if (!processedVariant.imageUrl.startsWith('/images/products/') && 
+          !processedVariant.imageUrl.startsWith('http')) {
+        // If it's a relative path starting with images/ but missing the leading slash
+        if (processedVariant.imageUrl.startsWith('images/products/')) {
+          processedVariant.imageUrl = '/' + processedVariant.imageUrl;
+        } else if (processedVariant.imageUrl.startsWith('/uploads/products/') || 
+                  processedVariant.imageUrl.startsWith('uploads/products/')) {
+          // Handle old path format
+          const filename = processedVariant.imageUrl.split('/').pop();
+          processedVariant.imageUrl = `/images/products/${filename || 'placeholder.svg'}`;
+        } else {
+          // Extract just the filename if it's a path
+          const filename = processedVariant.imageUrl.split('/').pop();
+          processedVariant.imageUrl = `/images/products/${filename || 'placeholder.svg'}`;
+        }
+      }
+    } else {
+      // Set default placeholder if no image
+      processedVariant.imageUrl = '/images/products/placeholder.svg';
+    }
+    
+    return res.status(200).json({ 
+      status: 'success',
+      data: {
+        item: processedVariant
+      }
+    });
   } catch (error) {
     console.error('Error fetching product variant:', error);
-    return res.status(500).json({ error: 'Failed to fetch product variant' });
+    return res.status(500).json({ 
+      status: 'error',
+      message: 'Failed to fetch product variant' 
+    });
   }
 });
 
@@ -75,20 +144,44 @@ router.post('/:productId/variants', requireAuth, async (req, res) => {
     // Validate request body
     const validatedData = ProductVariantSchema.parse(req.body);
     
+    // Check if product exists
+    const product = await prisma.product.findUnique({
+      where: { id: productId }
+    });
+    
+    if (!product) {
+      return res.status(404).json({ 
+        status: 'error',
+        message: 'Product not found' 
+      });
+    }
+    
     // Create the variant
-    const newVariant = await productVariantService.createVariant({
+    const newVariant = await productVariantService.create({
       ...validatedData,
       productId,
     });
     
-    return res.status(201).json(newVariant);
+    return res.status(201).json({ 
+      status: 'success',
+      data: {
+        item: newVariant
+      }
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors });
+      return res.status(400).json({ 
+        status: 'error',
+        message: 'Invalid variant data',
+        details: error.errors
+      });
     }
     
     console.error('Error creating product variant:', error);
-    return res.status(500).json({ error: 'Failed to create product variant' });
+    return res.status(500).json({ 
+      status: 'error',
+      message: 'Failed to create product variant' 
+    });
   }
 });
 
@@ -101,23 +194,70 @@ router.put('/:productId/variants/:variantId', requireAuth, async (req, res) => {
     const validatedData = ProductVariantSchema.parse(req.body);
     
     // Check if variant exists
-    const existingVariant = await productVariantService.getVariantById(variantId);
+    const existingVariant = await productVariantService.getById(variantId);
     
     if (!existingVariant) {
-      return res.status(404).json({ error: 'Product variant not found' });
+      return res.status(404).json({ 
+        status: 'error',
+        message: 'Variant not found' 
+      });
     }
     
     // Update the variant
-    const updatedVariant = await productVariantService.updateVariant(variantId, validatedData);
+    const updatedVariant = await productVariantService.update({
+      id: variantId,
+      ...validatedData
+    });
     
-    return res.status(200).json(updatedVariant);
+    if (!updatedVariant) {
+      return res.status(500).json({ 
+        status: 'error',
+        message: 'Failed to update variant' 
+      });
+    }
+    
+    // Process image URL for consistency
+    let processedVariant = { ...updatedVariant };
+    if (processedVariant.imageUrl) {
+      // If imageUrl is just a filename or doesn't have the proper prefix
+      if (!processedVariant.imageUrl.startsWith('/images/products/') && 
+          !processedVariant.imageUrl.startsWith('http')) {
+        // If it's a relative path starting with images/ but missing the leading slash
+        if (processedVariant.imageUrl.startsWith('images/products/')) {
+          processedVariant.imageUrl = '/' + processedVariant.imageUrl;
+        } else if (processedVariant.imageUrl.startsWith('/uploads/products/') || 
+                  processedVariant.imageUrl.startsWith('uploads/products/')) {
+          // Handle old path format
+          const filename = processedVariant.imageUrl.split('/').pop();
+          processedVariant.imageUrl = `/images/products/${filename || 'placeholder.svg'}`;
+        } else {
+          // Extract just the filename if it's a path
+          const filename = processedVariant.imageUrl.split('/').pop();
+          processedVariant.imageUrl = `/images/products/${filename || 'placeholder.svg'}`;
+        }
+      }
+    }
+    
+    return res.status(200).json({ 
+      status: 'success',
+      data: {
+        item: processedVariant
+      }
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors });
+      return res.status(400).json({ 
+        status: 'error',
+        message: 'Invalid variant data',
+        details: error.errors
+      });
     }
     
     console.error('Error updating product variant:', error);
-    return res.status(500).json({ error: 'Failed to update product variant' });
+    return res.status(500).json({ 
+      status: 'error',
+      message: 'Failed to update product variant' 
+    });
   }
 });
 
@@ -127,19 +267,30 @@ router.delete('/:productId/variants/:variantId', requireAuth, async (req, res) =
     const { variantId } = req.params;
     
     // Check if variant exists
-    const existingVariant = await productVariantService.getVariantById(variantId);
+    const existingVariant = await productVariantService.getById(variantId);
     
     if (!existingVariant) {
-      return res.status(404).json({ error: 'Product variant not found' });
+      return res.status(404).json({ 
+        status: 'error',
+        message: 'Variant not found' 
+      });
     }
     
     // Delete the variant
-    await productVariantService.deleteVariant(variantId);
+    await productVariantService.delete(variantId);
     
-    return res.status(200).json({ message: 'Product variant deleted successfully' });
+    return res.status(200).json({ 
+      status: 'success',
+      data: {
+        message: 'Variant deleted successfully'
+      }
+    });
   } catch (error) {
     console.error('Error deleting product variant:', error);
-    return res.status(500).json({ error: 'Failed to delete product variant' });
+    return res.status(500).json({ 
+      status: 'error',
+      message: 'Failed to delete product variant' 
+    });
   }
 });
 

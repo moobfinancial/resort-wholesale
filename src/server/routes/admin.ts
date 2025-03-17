@@ -17,16 +17,28 @@ router.post('/login', async (req, res) => {
 
     const admin = await prisma.admin.findUnique({
       where: { email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        passwordHash: true,
+      },
     });
 
     if (!admin) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid credentials'
+      });
     }
 
     const isPasswordValid = await bcrypt.compare(password, admin.passwordHash);
 
     if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid credentials'
+      });
     }
 
     const token = jwt.sign(
@@ -47,23 +59,41 @@ router.post('/login', async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     });
 
+    // Return response in consistent format
     res.json({
-      id: admin.id,
-      email: admin.email,
-      name: admin.name,
+      status: 'success',
+      data: {
+        admin: {
+          id: admin.id,
+          email: admin.email,
+          name: admin.name,
+        },
+        token
+      }
     });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'Invalid input', errors: error.errors });
-    }
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid input',
+        details: error.errors
+      });
+    }
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });
 
 router.post('/logout', (req, res) => {
   res.clearCookie('admin_token');
-  res.json({ message: 'Logged out successfully' });
+  res.json({
+    status: 'success',
+    data: null
+  });
 });
 
 router.get('/me', async (req, res) => {
@@ -71,7 +101,10 @@ router.get('/me', async (req, res) => {
     const token = req.cookies.admin_token;
 
     if (!token) {
-      return res.status(401).json({ message: 'Not authenticated' });
+      return res.status(401).json({
+        status: 'error',
+        message: 'Not authenticated'
+      });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as {
@@ -90,13 +123,27 @@ router.get('/me', async (req, res) => {
     });
 
     if (!admin) {
-      return res.status(401).json({ message: 'Admin not found' });
+      return res.status(401).json({
+        status: 'error',
+        message: 'Admin not found'
+      });
     }
 
-    res.json(admin);
+    // Return response in consistent format
+    res.json({
+      status: 'success',
+      data: {
+        admin,
+        token
+      }
+    });
   } catch (error) {
     console.error('Auth check error:', error);
-    res.status(401).json({ message: 'Invalid token' });
+    res.status(401).json({
+      status: 'error',
+      message: 'Invalid token',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });
 

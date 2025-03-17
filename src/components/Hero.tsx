@@ -18,12 +18,12 @@ export default function Hero() {
             Wholesale & Retail Solutions for Your Business
           </p>
           <div className="flex space-x-4">
-            <button className="bg-blue-900 text-white px-8 py-3 rounded-lg hover:bg-blue-800">
+            <a href="/products" className="bg-blue-900 text-white px-8 py-3 rounded-lg hover:bg-blue-800 inline-block">
               Shop Wholesale
-            </button>
-            <button className="bg-white text-blue-900 px-8 py-3 rounded-lg hover:bg-gray-100">
+            </a>
+            <a href="/products" className="bg-white text-blue-900 px-8 py-3 rounded-lg hover:bg-gray-100 inline-block">
               Shop Retail
-            </button>
+            </a>
           </div>
         </div>
       </div>

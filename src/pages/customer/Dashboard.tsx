@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShoppingBag, 
   CreditCard, 
@@ -10,7 +10,7 @@ import {
   FileText,
   DollarSign
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useCustomerAuthStore } from '../../stores/customerAuth';
 import PurchaseHistory from '../../components/dashboard/PurchaseHistory';
 import PaymentMethods from '../../components/dashboard/PaymentMethods';
@@ -31,7 +31,17 @@ type TabType =
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('purchases');
   const navigate = useNavigate();
+  const location = useLocation();
   const logout = useCustomerAuthStore(state => state.logout);
+
+  // Check for tab parameter in URL on component mount
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const tabParam = queryParams.get('tab');
+    if (tabParam && tabs.some(tab => tab.id === tabParam)) {
+      setActiveTab(tabParam as TabType);
+    }
+  }, [location]);
 
   const tabs = [
     { id: 'purchases', label: 'Purchase History', icon: ShoppingBag },

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Phone, Mail, Clock } from 'lucide-react';
+import { MapPin, Phone, Mail, Clock, Link } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function ContactUs() {
@@ -54,9 +54,10 @@ export default function ContactUs() {
                   <div className="ml-4">
                     <h3 className="text-lg font-medium text-gray-900">Our Location</h3>
                     <p className="mt-1 text-gray-600">
-                      123 Business Avenue<br />
-                      Suite 100<br />
-                      New York, NY 10001
+                      Resort Accessories Limited<br />
+                      7 Norbrook Terrace<br />
+                      Kingston 8, St. Andrew<br />
+                      Jamaica
                     </p>
                   </div>
                 </div>
@@ -67,7 +68,7 @@ export default function ContactUs() {
                   </div>
                   <div className="ml-4">
                     <h3 className="text-lg font-medium text-gray-900">Phone</h3>
-                    <p className="mt-1 text-gray-600">+1 (555) 123-4567</p>
+                    <p className="mt-1 text-gray-600">1-876-568-4855</p>
                   </div>
                 </div>
 
@@ -77,7 +78,17 @@ export default function ContactUs() {
                   </div>
                   <div className="ml-4">
                     <h3 className="text-lg font-medium text-gray-900">Email</h3>
-                    <p className="mt-1 text-gray-600">contact@resortwholesale.com</p>
+                    <p className="mt-1 text-gray-600">Info@resortaccessoires.shop</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <Link className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div className="ml-4">
+                    <h3 className="text-lg font-medium text-gray-900">Website</h3>
+                    <p className="mt-1 text-gray-600">https://resort-accessories.shop</p>
                   </div>
                 </div>
 

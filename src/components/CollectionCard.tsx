@@ -36,23 +36,32 @@ const CollectionCard: React.FC<CollectionCardProps> = ({ collection, className =
               const target = e.target as HTMLImageElement;
               console.error(`Failed to load image for collection: ${collection.name}`, collection.imageUrl);
               
-              // Try different paths before giving up
-              if (!target.src.includes('/images/categories/') && !target.src.includes('placeholder')) {
-                const filename = collection.imageUrl?.split('/').pop();
-                target.src = `/images/categories/${filename || 'placeholder.jpg'}`;
-                console.log('Trying with /images/categories/ path:', target.src);
+              // Prevent infinite loop - if already trying to load placeholder, stop
+              if (target.src.includes('placeholder')) {
+                console.log('Already using placeholder, stopping error handling');
                 return;
               }
               
-              // If we've already tried the categories path or that failed too
-              if (!target.src.includes('/uploads/collections/') && !target.src.includes('placeholder')) {
-                const filename = collection.imageUrl?.split('/').pop();
-                target.src = `/uploads/collections/${filename || 'placeholder.jpg'}`;
-                console.log('Trying with /uploads/collections/ path:', target.src);
-                return;
+              // Standardized image loading pattern
+              if (collection.imageUrl) {
+                const filename = collection.imageUrl.split('/').pop();
+                
+                // Step 1: If not already using /images/categories/ path, try that first
+                if (!target.src.includes('/images/categories/')) {
+                  console.log('Trying with /images/categories/ path');
+                  target.src = `/images/categories/${filename || ''}`;
+                  return;
+                }
+                
+                // Step 2: If that failed and we're not using /uploads/collections/, try that
+                else if (!target.src.includes('/uploads/collections/')) {
+                  console.log('Trying with /uploads/collections/ path');
+                  target.src = `/uploads/collections/${filename || ''}`;
+                  return;
+                }
               }
               
-              // If all else fails, use the placeholder
+              // Step 3: Final fallback to placeholder image
               setImageError(true);
               target.src = placeholderImageUrl;
               console.log('Using placeholder image');

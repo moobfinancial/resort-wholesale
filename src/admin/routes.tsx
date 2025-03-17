@@ -78,15 +78,54 @@ const CustomerDetails = lazy(() => import('./pages/customers/CustomerDetails'));
 const SupplierManagement = lazy(() => import('./pages/suppliers/SupplierManagement'));
 const SupplierOrderForm = lazy(() => import('./pages/suppliers/SupplierOrderForm'));
 
-// Wrap lazy-loaded components with Suspense
-const withSuspense = (Component: React.LazyExoticComponent<any>) => {
-  const SuspendedComponent = () => (
-    <Suspense fallback={<LoadingFallback />}>
-      <Component />
-    </Suspense>
-  );
-  return <SuspendedComponent />;
-};
+// Define suspense-wrapped components
+const SuspenseCustomerList = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <CustomerList />
+  </Suspense>
+);
+
+const SuspenseCustomerDetails = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <CustomerDetails />
+  </Suspense>
+);
+
+const SuspenseSupplierManagement = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <SupplierManagement />
+  </Suspense>
+);
+
+const SuspenseSupplierOrderForm = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <SupplierOrderForm />
+  </Suspense>
+);
+
+const SuspenseDashboard = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <Dashboard />
+  </Suspense>
+);
+
+const SuspenseOrders = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <Orders />
+  </Suspense>
+);
+
+const SuspenseSettings = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <Settings />
+  </Suspense>
+);
+
+const SuspenseNewProduct = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <NewProduct />
+  </Suspense>
+);
 
 export const adminRoutes: RouteObject[] = [
   {
@@ -100,7 +139,7 @@ export const adminRoutes: RouteObject[] = [
     children: [
       {
         index: true,
-        element: withSuspense(Dashboard),
+        element: <SuspenseDashboard />,
       },
       {
         path: 'products',
@@ -111,7 +150,7 @@ export const adminRoutes: RouteObject[] = [
           },
           {
             path: 'new',
-            element: <NewProduct />,
+            element: <SuspenseNewProduct />,
           },
           {
             path: ':id',
@@ -155,22 +194,22 @@ export const adminRoutes: RouteObject[] = [
       },
       {
         path: 'orders',
-        element: withSuspense(Orders),
+        element: <SuspenseOrders />,
       },
       {
         path: 'settings',
-        element: withSuspense(Settings),
+        element: <SuspenseSettings />,
       },
       {
         path: 'customers',
         children: [
           {
             index: true,
-            element: withSuspense(CustomerList),
+            element: <SuspenseCustomerList />,
           },
           {
             path: ':id',
-            element: withSuspense(CustomerDetails),
+            element: <SuspenseCustomerDetails />,
           },
         ],
       },
@@ -192,15 +231,15 @@ export const adminRoutes: RouteObject[] = [
         children: [
           {
             index: true,
-            element: withSuspense(SupplierManagement),
+            element: <SuspenseSupplierManagement />,
           },
           {
             path: ':supplierId/orders/new',
-            element: withSuspense(SupplierOrderForm),
+            element: <SuspenseSupplierOrderForm />,
           },
           {
             path: ':supplierId/orders/:orderId',
-            element: withSuspense(SupplierOrderForm),
+            element: <SuspenseSupplierOrderForm />,
           },
         ],
       },

@@ -22,7 +22,7 @@ import {
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import api from '../../../utils/api';
+import { api } from '../../../utils/axios';
 
 const { Title } = Typography;
 const { Search } = Input;
@@ -37,15 +37,33 @@ interface BusinessCustomer {
   registrationDate: string;
   lastOrderDate: string | null;
   totalOrders: number;
+  address?: {
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+  };
 }
 
-interface ResponseData {
-  data: BusinessCustomer[];
-  pagination: {
-    total: number;
-    pageSize: number;
-    current: number;
-  };
+interface StandardResponse<T> {
+  status: string;
+  data: T;
+  message?: string;
+}
+
+interface LegacyResponse {
+  data?: any[];
+  items?: BusinessCustomer[];
+  customers?: BusinessCustomer[];
+  [key: string]: any;
+}
+
+interface CustomersData {
+  items?: BusinessCustomer[];
+  total?: number;
+  page?: number;
+  limit?: number;
 }
 
 const CustomerList: React.FC = () => {
@@ -68,15 +86,68 @@ const CustomerList: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get('/business-customers');
-      if (response && response.data) {
-        if (response.data.status === 'success' && Array.isArray(response.data.data)) {
-          setCustomers(response.data.data);
+      const response = await api.customers.list();
+      console.log('Customers response:', response);
+
+      if (response.data && typeof response.data === 'object' && 'status' in response.data && response.data.status === 'success') {
+        const responseData = response.data as StandardResponse<CustomersData | BusinessCustomer[]>;
+
+        if (responseData.data && typeof responseData.data === 'object' && !Array.isArray(responseData.data) && 'items' in responseData.data) {
+          const itemsData = responseData.data as CustomersData;
+          setCustomers(itemsData.items || []);
+          setPagination({
+            ...pagination,
+            total: itemsData.total || itemsData.items?.length || 0,
+            current: itemsData.page || 1,
+            pageSize: itemsData.limit || 10,
+          });
+        } else if (Array.isArray(responseData.data)) {
+          setCustomers(responseData.data);
+          setPagination({
+            ...pagination,
+            total: responseData.data.length,
+          });
         } else {
-          setCustomers(Array.isArray(response.data) ? response.data : []);
+          console.warn('Unexpected data structure in success response:', responseData);
+          setCustomers([]);
+          setError('Unexpected data format received');
+        }
+      } else if (Array.isArray(response.data)) {
+        setCustomers(response.data);
+        setPagination({
+          ...pagination,
+          total: response.data.length,
+        });
+      } else if (response.data && typeof response.data === 'object') {
+        const legacyData = response.data as LegacyResponse;
+
+        if (Array.isArray(legacyData.data)) {
+          setCustomers(legacyData.data as BusinessCustomer[]);
+          setPagination({
+            ...pagination,
+            total: legacyData.data.length,
+          });
+        } else if (Array.isArray(legacyData.items)) {
+          setCustomers(legacyData.items);
+          setPagination({
+            ...pagination,
+            total: legacyData.items.length,
+          });
+        } else if (Array.isArray(legacyData.customers)) {
+          setCustomers(legacyData.customers);
+          setPagination({
+            ...pagination,
+            total: legacyData.customers.length,
+          });
+        } else {
+          console.warn('Unexpected response format:', response.data);
+          setCustomers([]);
+          setError('Could not parse customer data');
         }
       } else {
-        throw new Error('Invalid response format');
+        console.warn('Unexpected response format:', response.data);
+        setCustomers([]);
+        setError('No customers found or invalid data format');
       }
     } catch (error) {
       console.error('Error fetching customers:', error);
@@ -89,10 +160,18 @@ const CustomerList: React.FC = () => {
 
   const handleStatusChange = async (customerId: string, newStatus: string) => {
     try {
-      await api.put(`/business-customers/${customerId}/status`, { status: newStatus });
-      message.success('Customer status updated successfully');
+      const response = await api.customers.update(customerId, { status: newStatus });
+
+      if (response.data && typeof response.data === 'object' && 'status' in response.data && response.data.status === 'success') {
+        const responseData = response.data as StandardResponse<any>;
+        message.success(responseData.message || 'Customer status updated successfully');
+      } else {
+        message.success('Customer status updated successfully');
+      }
+
       fetchCustomers();
     } catch (error) {
+      console.error('Error updating customer status:', error);
       message.error('Failed to update customer status');
     }
   };

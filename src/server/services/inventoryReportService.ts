@@ -225,7 +225,7 @@ export const inventoryReportService = {
           },
         },
         include: {
-          items: {
+          OrderItems: {
             include: {
               product: {
                 select: {
@@ -243,7 +243,7 @@ export const inventoryReportService = {
       const productSales = new Map<string, { id: string; name: string; sku: string; soldQuantity: number }>();
       
       orders.forEach(order => {
-        order.items.forEach(item => {
+        order.OrderItems.forEach(item => {
           const productId = item.productId;
           const existing = productSales.get(productId) || {
             id: productId,

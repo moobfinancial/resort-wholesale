@@ -1,17 +1,29 @@
-import React, { useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useCartStore } from '../stores/cartStore';
+import { useGuestCartStore } from '../stores/guestCartStore';
 import { formatPrice } from '../utils/formatters';
 import { Button, Card, Divider, Empty, InputNumber, Spin, Typography } from 'antd';
 import { DeleteOutlined, ShoppingCartOutlined, ShoppingOutlined } from '@ant-design/icons';
 import { toast } from 'react-hot-toast';
 import { useCustomerAuthStore } from '../stores/customerAuth';
+import AuthModal from '../components/auth/AuthModal';
 
 const { Title, Text } = Typography;
 
 const Cart: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useCustomerAuthStore();
+  // Get authentication state and watch for changes
+  const isAuthenticated = useCustomerAuthStore(state => state.isAuthenticated);
+  
+  // Use the appropriate cart store based on authentication status
+  const cartStore = isAuthenticated ? useCartStore() : useGuestCartStore();
+  
+  // Debug authentication state
+  useEffect(() => {
+    console.log('Authentication state in Cart:', isAuthenticated);
+  }, [isAuthenticated]);
+  
   const { 
     items, 
     loading, 
@@ -21,11 +33,12 @@ const Cart: React.FC = () => {
     updateQuantity, 
     getCartTotal,
     getCartItemCount
-  } = useCartStore();
+  } = cartStore;
 
   useEffect(() => {
+    console.log('Cart component: Loading cart. isAuthenticated =', isAuthenticated);
     loadCart();
-  }, [loadCart]);
+  }, [loadCart, isAuthenticated]);
 
   useEffect(() => {
     if (error) {
@@ -44,13 +57,83 @@ const Cart: React.FC = () => {
     toast.success('Item removed from cart');
   };
 
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const location = useLocation();
+
+  // Check if we're returning from login or if we need to show the auth modal
+  useEffect(() => {
+    console.log('Cart: Authentication state changed:', isAuthenticated);
+    console.log('Cart: Location state:', location.state);
+    
+    // If we just logged in, transfer guest cart items to the user cart
+    if (isAuthenticated) {
+      console.log('User is authenticated, checking for guest cart items to transfer');
+      transferGuestCartToUserCart();
+    }
+    
+    // If we're redirected from checkout, show the auth modal
+    if (location.state?.showAuthModal) {
+      setIsAuthModalOpen(true);
+      // Clear the state to prevent modal from showing again on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [isAuthenticated, location]);
+
+  // Function to transfer guest cart items to user cart
+  const transferGuestCartToUserCart = async () => {
+    const guestCartItems = useGuestCartStore.getState().items;
+    console.log('Transferring guest cart items to user cart:', guestCartItems);
+    
+    if (guestCartItems.length > 0) {
+      try {
+        const { addItem } = useCartStore.getState();
+        
+        // Add each guest cart item to the user cart one by one
+        for (const item of guestCartItems) {
+          console.log('Transferring item:', item);
+          try {
+            await addItem(item.productId, item.quantity, item.variantId);
+            console.log('Item transferred successfully');
+          } catch (itemError) {
+            console.error('Error transferring item:', itemError);
+            // Continue with next item even if this one fails
+          }
+        }
+        
+        // Clear the guest cart
+        await useGuestCartStore.getState().clearCart();
+        
+        // Reload the user cart
+        loadCart();
+        
+        toast.success('Your cart items have been transferred to your account');
+      } catch (error) {
+        console.error('Error transferring cart items:', error);
+        toast.error('Failed to transfer some items to your cart');
+      }
+    } else {
+      console.log('No guest cart items to transfer');
+    }
+  };
+
+  // Handle successful sign in
+  const handleSignIn = () => {
+    setIsAuthModalOpen(false);
+    // The transferGuestCartToUserCart function will be called by the useEffect above
+  };
+
   const handleCheckout = () => {
-    if (!isAuthenticated) {
-      toast.error('Please sign in to checkout');
-      navigate('/login', { state: { from: '/cart' } });
+    // Force re-check of authentication state
+    const currentAuthState = useCustomerAuthStore.getState().isAuthenticated;
+    console.log('Current auth state in handleCheckout:', currentAuthState);
+    
+    if (!currentAuthState) {
+      // Show auth modal instead of redirecting
+      setIsAuthModalOpen(true);
       return;
     }
     
+    // User is authenticated, proceed to checkout
     navigate('/checkout');
   };
 
@@ -87,6 +170,12 @@ const Cart: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSignIn={handleSignIn}
+      />
       <Title level={2} className="mb-8">Your Cart ({itemCount} {itemCount === 1 ? 'item' : 'items'})</Title>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -97,7 +186,11 @@ const Cart: React.FC = () => {
               const product = item.product;
               const variant = item.variant;
               const price = variant?.price || product.price;
-              const imageUrl = variant?.imageUrl || product.imageUrl;
+              
+              // Handle image URL safely - product only has images array, not imageUrl
+              const imageUrl = variant?.imageUrl || 
+                (product.images && product.images.length > 0 ? product.images[0] : '/images/products/placeholder.svg');
+              
               const itemTotal = price * item.quantity;
               
               return (
@@ -121,18 +214,19 @@ const Cart: React.FC = () => {
                             {product.name}
                           </Link>
                           
-                          {variant && (
+                          {/* Variant attributes - only show if variant exists and has attributes property */}
+                          {variant && 'attributes' in variant && variant.attributes && (
                             <div className="mt-1 text-sm text-gray-500">
                               {Object.entries(variant.attributes).map(([key, value]) => (
                                 <span key={key} className="mr-4">
-                                  {key}: {value}
+                                  {key}: {String(value)}
                                 </span>
                               ))}
                             </div>
                           )}
                           
                           <div className="mt-1 text-sm text-gray-500">
-                            SKU: {variant?.sku || product.sku}
+                            SKU: {variant?.sku || 'N/A'}
                           </div>
                         </div>
                         

@@ -61,11 +61,12 @@ export const orderService = {
     for (const item of items) {
       if (item.variantId) {
         // Check variant stock
+        // Type assertion for the raw query result
         const variantResult = await prisma.$queryRaw`
-          SELECT id, stock, sku FROM "ProductVariant" WHERE id = ${item.variantId}
-        `;
+          SELECT id, stock, sku, attributes FROM "ProductVariant" WHERE id = ${item.variantId}
+        ` as Array<{ id: string; stock: number; sku: string; attributes: Record<string, string> }>;
         
-        const variant = variantResult[0] as { id: string; stock: number; sku: string } | undefined;
+        const variant = variantResult.length > 0 ? variantResult[0] : undefined;
 
         if (!variant || variant.stock < item.quantity) {
           const product = await prisma.product.findUnique({
@@ -73,10 +74,13 @@ export const orderService = {
             select: { id: true, name: true },
           });
 
+          // Safely handle attributes
+          const variantAttributes = variant && variant.attributes ? Object.values(variant.attributes).join(', ') : '';
+          
           insufficientItems.push({
             productId: item.productId,
             variantId: item.variantId,
-            name: product ? `${product.name} (${Object.values(variant?.attributes).join(', ')})` : 'Unknown Variant',
+            name: product ? `${product.name} (${variantAttributes})` : 'Unknown Variant',
             available: variant ? variant.stock : 0,
             requested: item.quantity,
           });
@@ -109,11 +113,12 @@ export const orderService = {
 
     // If there's a variant, use its price
     if (variantId) {
+      // Type assertion for the raw query result
       const variantResult = await prisma.$queryRaw`
         SELECT price FROM "ProductVariant" WHERE id = ${variantId}
-      `;
+      ` as Array<{ price: Prisma.Decimal }>;
       
-      const variant = variantResult[0] as { price: Prisma.Decimal } | undefined;
+      const variant = variantResult.length > 0 ? variantResult[0] : undefined;
 
       if (!variant) {
         throw new Error(`Variant not found: ${variantId}`);

@@ -7,6 +7,18 @@ export interface BulkPricing {
   updatedAt?: Date;
 }
 
+export interface ProductImage {
+  id?: string;
+  url: string;
+  altText?: string;
+  isDefault: boolean;
+  sortOrder: number;
+  productId: string;
+  variantId?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export interface ProductVariant {
   id?: string;
   productId: string;
@@ -15,6 +27,7 @@ export interface ProductVariant {
   stock: number;
   attributes: Record<string, any>;
   imageUrl?: string;
+  images?: ProductImage[];
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -49,6 +62,7 @@ export interface Product {
   updatedAt: Date;
   variants?: ProductVariant[];
   bulkPricing?: BulkPricing[];
+  images?: ProductImage[];
 }
 
 export interface Supplier {

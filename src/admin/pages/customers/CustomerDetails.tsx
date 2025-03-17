@@ -49,7 +49,18 @@ interface BusinessCustomer {
     status: 'PENDING' | 'VERIFIED' | 'REJECTED';
   }[];
   creditLimit: number;
-  paymentTerms: string;
+  paymentMethods?: any[];
+  paymentTerms?: string;
+  billingAddress?: {
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+  };
+  notificationPreferences?: string[];
+  language?: string;
+  timezone?: string;
 }
 
 interface Order {
@@ -91,7 +102,13 @@ const CustomerDetails: React.FC = () => {
       const result = await response.json();
       
       if (result && result.status === 'success' && result.data) {
-        setCustomer(result.data);
+        // Single resources are returned under data.item property according to API standard
+        if (result.data.item) {
+          setCustomer(result.data.item);
+        } else {
+          // Fallback for legacy API format or direct data objects
+          setCustomer(result.data);
+        }
       } else if (result && !result.status) {
         // Direct data without the standard API wrapper
         setCustomer(result);
@@ -240,13 +257,26 @@ const CustomerDetails: React.FC = () => {
           <Descriptions.Item label="Contact Name">{customer.contactName}</Descriptions.Item>
           <Descriptions.Item label="Email">{customer.email}</Descriptions.Item>
           <Descriptions.Item label="Phone">{customer.phone}</Descriptions.Item>
+          <Descriptions.Item label="Business Type">{customer.businessType || 'Not specified'}</Descriptions.Item>
+          <Descriptions.Item label="Tax ID">{customer.taxId || 'Not specified'}</Descriptions.Item>
           <Descriptions.Item label="Status">
             <Tag color={customer.status === 'VERIFIED' ? 'green' : 'gold'}>
               {customer.status}
             </Tag>
           </Descriptions.Item>
           <Descriptions.Item label="Registration Date">
-            {new Date(customer.registrationDate).toLocaleDateString()}
+            {customer.registrationDate ? new Date(customer.registrationDate).toLocaleDateString() : 'Not available'}
+          </Descriptions.Item>
+          <Descriptions.Item label="Address" span={3}>
+            {customer.address ? (
+              <>
+                {customer.address.street}<br />
+                {customer.address.city}, {customer.address.state} {customer.address.zipCode}<br />
+                {customer.address.country}
+              </>
+            ) : (
+              'No address provided'
+            )}
           </Descriptions.Item>
         </Descriptions>
       </Card>
@@ -279,15 +309,45 @@ const CustomerDetails: React.FC = () => {
           
           <Tabs.TabPane tab="User Settings" key="settings">
             <UserSettings 
-              customer={customer} 
+              customer={{
+                id: customer.id,
+                companyName: customer.companyName,
+                contactName: customer.contactName,
+                email: customer.email,
+                phone: customer.phone || '',
+                businessType: customer.businessType || '',
+                taxId: customer.taxId || '',
+                address: customer.address || {
+                  street: '',
+                  city: '',
+                  state: '',
+                  zipCode: '',
+                  country: ''
+                },
+                notificationPreferences: [],
+                language: 'en',
+                timezone: 'America/New_York'
+              }}
               onUpdate={handleUpdateCustomer} 
             />
           </Tabs.TabPane>
 
           <Tabs.TabPane tab="Payment Details" key="payment">
             <PaymentDetails 
-              customer={customer}
-              onUpdate={handleUpdateCustomer}
+              customer={{
+                id: customer.id,
+                paymentMethods: customer.paymentMethods || [],
+                creditLimit: customer.creditLimit || 0,
+                paymentTerms: customer.paymentTerms || 'Net 30',
+                billingAddress: customer.address || {
+                  street: '',
+                  city: '',
+                  state: '',
+                  zipCode: '',
+                  country: ''
+                }
+              }}
+              onUpdate={handleUpdateCustomer} 
             />
           </Tabs.TabPane>
 

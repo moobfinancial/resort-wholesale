@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import SignIn from './SignIn';
 import SignUp from './SignUp';
+import { useCustomerAuthStore } from '../../stores/customerAuth';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -11,6 +12,16 @@ interface AuthModalProps {
 
 export default function AuthModal({ isOpen, onClose, onSignIn }: AuthModalProps) {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const isAuthenticated = useCustomerAuthStore(state => state.isAuthenticated);
+  
+  // Close modal automatically when user becomes authenticated
+  useEffect(() => {
+    if (isAuthenticated && isOpen) {
+      console.log('User authenticated, closing modal');
+      onSignIn();
+      onClose();
+    }
+  }, [isAuthenticated, isOpen, onSignIn, onClose]);
 
   if (!isOpen) return null;
 

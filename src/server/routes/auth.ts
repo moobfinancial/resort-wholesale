@@ -1,13 +1,8 @@
 import express from 'express';
-import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import bcrypt from 'bcrypt';
-import { prisma } from '../../lib/prisma';
+import { authService } from '../services/authService';
 
 const router = express.Router();
-
-// Get JWT_SECRET from environment variable or use default for development
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Validation schema for login
 const loginSchema = z.object({
@@ -20,96 +15,172 @@ router.post('/login', async (req, res) => {
     // Validate request body
     const { email, password } = loginSchema.parse(req.body);
 
-    // Get the admin from the database
-    const admin = await prisma.admin.findUnique({
-      where: { email },
-    });
-
-    if (!admin) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    // Compare password with stored hash
-    const passwordMatch = await bcrypt.compare(password, admin.passwordHash);
+    // Use auth service for login
+    const result = await authService.loginAdmin(email, password);
     
-    if (!passwordMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+    if (result.status === 'error') {
+      return res.status(401).json(result);
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { 
-        id: admin.id,
-        email: admin.email,
-        role: 'admin',
-      },
-      JWT_SECRET,
-      { expiresIn: '1d' }
-    );
+    // Set token in cookie for web clients
+    if (result.data?.token) {
+      res.cookie('admin_token', result.data.token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      });
+    }
 
-    // Set token in cookie
-    res.cookie('admin_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    });
-
-    // Return admin info
-    res.json({
-      id: admin.id,
-      email: admin.email,
-      name: admin.name,
-    });
+    // Return admin info and token in response body following standard format
+    return res.json(result);
   } catch (error) {
     console.error('Login error:', error);
     
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'Invalid input data', errors: error.errors });
+      return res.status(400).json({ 
+        status: 'error', 
+        message: 'Invalid input data', 
+        details: error.errors 
+      });
     }
     
-    res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ 
+      status: 'error', 
+      message: 'Server error',
+      data: null
+    });
   }
 });
 
-router.post('/logout', (req, res) => {
+// Development backdoor login - FOR DEVELOPMENT ONLY
+router.post('/dev-login', async (_req, res) => {
+  try {
+    // Use auth service for dev login
+    const result = authService.createDevLoginToken();
+    
+    if (result.status === 'error') {
+      return res.status(process.env.NODE_ENV === 'production' ? 404 : 400).json(result);
+    }
+
+    // Set token in cookie for web clients
+    if (result.data?.token) {
+      res.cookie('admin_token', result.data.token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+    }
+
+    // Return admin info and token in response body following standard format
+    return res.json(result);
+  } catch (error) {
+    console.error('Dev login error:', error);
+    return res.status(500).json({ 
+      status: 'error', 
+      message: 'Server error',
+      data: null
+    });
+  }
+});
+
+router.post('/logout', (_req, res) => {
   res.clearCookie('admin_token');
-  res.json({ message: 'Logged out successfully' });
+  res.json({ 
+    status: 'success',
+    data: { 
+      message: 'Logged out successfully' 
+    }
+  });
 });
 
 router.get('/me', async (req, res) => {
   try {
-    const token = req.cookies.admin_token;
+    const token = req.cookies.admin_token || 
+                 (req.headers.authorization?.startsWith('Bearer ') && 
+                  req.headers.authorization.split(' ')[1]);
     
     if (!token) {
-      return res.status(401).json({ message: 'Not authenticated' });
+      return res.status(401).json({ 
+        status: 'error', 
+        message: 'Not authenticated',
+        data: null
+      });
     }
     
-    // Verify token
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: string, email: string, role: string };
+    // Verify token with auth service
+    const decoded = await authService.verifyToken(token);
     
-    // Get admin from database
-    const admin = await prisma.admin.findUnique({
-      where: { id: decoded.id },
+    if (!decoded) {
+      return res.status(401).json({ 
+        status: 'error', 
+        message: 'Invalid or expired token',
+        data: null
+      });
+    }
+    
+    // For development backdoor tokens, skip database check
+    if (process.env.NODE_ENV !== 'production' && decoded.email === 'admin@resortfresh.com') {
+      return res.json({
+        status: 'success',
+        data: {
+          admin: {
+            id: decoded.id,
+            email: decoded.email,
+            name: 'Development Admin',
+            role: decoded.role || 'ADMIN'
+          }
+        }
+      });
+    }
+    
+    try {
+      // In production, validate admin exists in database
+      if (process.env.NODE_ENV === 'production') {
+        const isValidAdmin = await authService.validateAdmin(decoded.id);
+        
+        if (!isValidAdmin) {
+          return res.status(401).json({ 
+            status: 'error', 
+            message: 'Invalid admin account',
+            data: null
+          });
+        }
+      }
+      
+      // Return admin info in response
+      return res.json({
+        status: 'success',
+        data: {
+          admin: {
+            id: decoded.id,
+            email: decoded.email,
+            role: decoded.role || 'ADMIN'
+          }
+        }
+      });
+    } catch (dbError: unknown) {
+      console.error('Database error in /me endpoint:', dbError);
+      return res.status(500).json({
+        status: 'error',
+        message: 'Database error occurred',
+        details: process.env.NODE_ENV !== 'production' ? 
+          (dbError instanceof Error ? dbError.message : 'Unknown error') : 
+          'Unknown database error',
+        data: null
+      });
+    }
+  } catch (error: unknown) {
+    console.error('Auth check error:', error);
+    return res.status(401).json({ 
+      status: 'error', 
+      message: 'Authentication failed',
+      details: process.env.NODE_ENV !== 'production' ? 
+        (error instanceof Error ? error.message : 'Unknown error') : 
+        undefined,
+      data: null
     });
-    
-    if (!admin) {
-      return res.status(401).json({ message: 'Admin not found' });
-    }
-    
-    res.json({
-      id: admin.id,
-      email: admin.email,
-      name: admin.name,
-    });
-  } catch (error) {
-    console.error('Auth verification error:', error);
-    
-    if (error instanceof jwt.JsonWebTokenError) {
-      return res.status(401).json({ message: 'Invalid token' });
-    }
-    
-    res.status(500).json({ message: 'Server error' });
   }
 });
 

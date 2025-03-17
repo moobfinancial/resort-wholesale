@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../../lib/prisma';
 import { requireAdmin } from '../middleware/auth';
-import { Prisma } from '@prisma/client';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 
@@ -9,17 +9,74 @@ const router = Router();
 router.get('/:supplierId/orders', requireAdmin, async (req, res) => {
   try {
     const { supplierId } = req.params;
-    const orders = await prisma.supplierOrder.findMany({
-      where: { supplierId },
-      include: {
-        items: true,
-      },
-      orderBy: { createdAt: 'desc' },
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+    
+    // Verify supplier exists
+    const supplierResult = await prisma.$queryRaw`
+      SELECT * FROM "Supplier" WHERE id = ${supplierId}
+    `;
+    
+    const supplier = Array.isArray(supplierResult) && supplierResult.length > 0 ? supplierResult[0] : null;
+    
+    if (!supplier) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Supplier not found'
+      });
+    }
+    
+    // Get total count
+    const totalResult = await prisma.$queryRaw`
+      SELECT COUNT(*) as count FROM "SupplierOrder" WHERE "supplierId" = ${supplierId}
+    `;
+    
+    const total = Array.isArray(totalResult) && totalResult.length > 0 ? Number(totalResult[0].count) : 0;
+    
+    // Get supplier orders with pagination
+    const orders = await prisma.$queryRaw`
+      SELECT * FROM "SupplierOrder" 
+      WHERE "supplierId" = ${supplierId}
+      ORDER BY "createdAt" DESC
+      LIMIT ${limit} OFFSET ${skip}
+    `;
+    
+    // Get items for each order
+    const ordersWithItems = await Promise.all(
+      (Array.isArray(orders) ? orders : []).map(async (order: any) => {
+        const items = await prisma.$queryRaw`
+          SELECT * FROM "SupplierOrderItem" 
+          WHERE "supplierOrderId" = ${order.id}
+        `;
+        
+        return {
+          ...order,
+          items: Array.isArray(items) ? items : []
+        };
+      })
+    );
+    
+    // Calculate total pages
+    const totalPages = Math.ceil(total / limit);
+    
+    res.json({
+      status: 'success',
+      data: {
+        items: ordersWithItems,
+        total,
+        page,
+        limit,
+        totalPages
+      }
     });
-    res.json(orders);
   } catch (error) {
     console.error('Error fetching supplier orders:', error);
-    res.status(500).json({ error: 'Failed to fetch supplier orders' });
+    res.status(500).json({ 
+      status: 'error',
+      message: 'Failed to fetch supplier orders',
+      details: error instanceof Error ? error.message : undefined
+    });
   }
 });
 
@@ -27,24 +84,54 @@ router.get('/:supplierId/orders', requireAdmin, async (req, res) => {
 router.get('/:supplierId/orders/:orderId', requireAdmin, async (req, res) => {
   try {
     const { supplierId, orderId } = req.params;
-    const order = await prisma.supplierOrder.findUnique({
-      where: { 
-        id: orderId,
-        supplierId,
-      },
-      include: {
-        items: true,
-      },
-    });
+    
+    const orderResult = await prisma.$queryRaw`
+      SELECT * FROM "SupplierOrder" 
+      WHERE id = ${orderId} AND "supplierId" = ${supplierId}
+    `;
+    
+    const order = Array.isArray(orderResult) && orderResult.length > 0 ? orderResult[0] : null;
 
     if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+      return res.status(404).json({
+        status: 'error',
+        message: 'Order not found'
+      });
     }
+    
+    // Get items for the order
+    const items = await prisma.$queryRaw`
+      SELECT * FROM "SupplierOrderItem" 
+      WHERE "supplierOrderId" = ${orderId}
+    `;
+    
+    // Get supplier details
+    const supplierResult = await prisma.$queryRaw`
+      SELECT * FROM "Supplier" 
+      WHERE id = ${supplierId}
+    `;
+    
+    const supplier = Array.isArray(supplierResult) && supplierResult.length > 0 ? supplierResult[0] : null;
+    
+    const orderWithDetails = {
+      ...order,
+      items: Array.isArray(items) ? items : [],
+      supplier
+    };
 
-    res.json(order);
+    res.json({
+      status: 'success',
+      data: {
+        item: orderWithDetails
+      }
+    });
   } catch (error) {
     console.error('Error fetching supplier order:', error);
-    res.status(500).json({ error: 'Failed to fetch supplier order' });
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch supplier order',
+      details: error instanceof Error ? error.message : undefined
+    });
   }
 });
 
@@ -53,37 +140,115 @@ router.post('/:supplierId/orders', requireAdmin, async (req, res) => {
   try {
     const { supplierId } = req.params;
     const data = req.body;
+    
+    // Verify supplier exists
+    const supplierResult = await prisma.$queryRaw`
+      SELECT * FROM "Supplier" WHERE id = ${supplierId}
+    `;
+    
+    const supplier = Array.isArray(supplierResult) && supplierResult.length > 0 ? supplierResult[0] : null;
+    
+    if (!supplier) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Supplier not found'
+      });
+    }
 
-    // Create the order with items
-    const order = await prisma.supplierOrder.create({
+    // Validate items
+    if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Order must contain at least one item'
+      });
+    }
+
+    // Generate order number
+    const orderNumber = `SO-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const orderId = uuidv4();
+    const now = new Date();
+    
+    // Create the order
+    await prisma.$executeRaw`
+      INSERT INTO "SupplierOrder" (
+        id, 
+        "orderNumber", 
+        "supplierId", 
+        status, 
+        total, 
+        notes, 
+        "createdAt", 
+        "updatedAt"
+      ) VALUES (
+        ${orderId},
+        ${orderNumber},
+        ${supplierId},
+        ${data.status || 'PENDING'},
+        ${data.totalAmount || 0},
+        ${data.notes || null},
+        ${now},
+        ${now}
+      )
+    `;
+    
+    // Create order items
+    for (const item of data.items) {
+      const itemId = uuidv4();
+      await prisma.$executeRaw`
+        INSERT INTO "SupplierOrderItem" (
+          id, 
+          "supplierOrderId", 
+          "productName", 
+          sku, 
+          quantity, 
+          price, 
+          total, 
+          notes, 
+          "createdAt", 
+          "updatedAt"
+        ) VALUES (
+          ${itemId},
+          ${orderId},
+          ${item.productName},
+          ${item.sku || null},
+          ${item.quantity},
+          ${item.unitPrice || 0},
+          ${item.totalPrice || 0},
+          ${item.notes || null},
+          ${now},
+          ${now}
+        )
+      `;
+    }
+    
+    // Get the created order with items
+    const orderResult = await prisma.$queryRaw`
+      SELECT * FROM "SupplierOrder" WHERE id = ${orderId}
+    `;
+    
+    const order = Array.isArray(orderResult) && orderResult.length > 0 ? orderResult[0] : null;
+    
+    // Get items for the order
+    const items = await prisma.$queryRaw`
+      SELECT * FROM "SupplierOrderItem" WHERE "supplierOrderId" = ${orderId}
+    `;
+    
+    const orderWithItems = {
+      ...order,
+      items: Array.isArray(items) ? items : []
+    };
+
+    res.status(201).json({
+      status: 'success',
       data: {
-        orderNumber: `SO-${Date.now()}`, // Generate a unique order number
-        supplierId,
-        status: data.status || 'PENDING',
-        totalAmount: new Prisma.Decimal(data.totalAmount || 0),
-        expectedDeliveryDate: data.expectedDeliveryDate ? new Date(data.expectedDeliveryDate) : null,
-        deliveredDate: data.deliveredDate ? new Date(data.deliveredDate) : null,
-        notes: data.notes,
-        items: {
-          create: data.items.map((item: any) => ({
-            productName: item.productName,
-            quantity: item.quantity,
-            unitPrice: new Prisma.Decimal(item.unitPrice || 0),
-            totalPrice: new Prisma.Decimal(item.totalPrice || 0),
-            notes: item.notes,
-          })),
-        },
-      },
-      include: {
-        items: true,
-      },
+        item: orderWithItems
+      }
     });
-
-    res.status(201).json(order);
   } catch (error: any) {
     console.error('Error creating supplier order:', error);
     res.status(500).json({ 
-      error: 'Failed to create supplier order',
+      status: 'error',
+      message: 'Failed to create supplier order',
       details: error.message 
     });
   }
@@ -92,43 +257,99 @@ router.post('/:supplierId/orders', requireAdmin, async (req, res) => {
 // Update an order
 router.put('/:supplierId/orders/:orderId', requireAdmin, async (req, res) => {
   try {
-    const { orderId } = req.params;
+    const { supplierId, orderId } = req.params;
     const data = req.body;
+    
+    // Check if order exists and belongs to this supplier
+    const existingOrderResult = await prisma.$queryRaw`
+      SELECT * FROM "SupplierOrder" 
+      WHERE id = ${orderId} AND "supplierId" = ${supplierId}
+    `;
+    
+    const existingOrder = Array.isArray(existingOrderResult) && existingOrderResult.length > 0 ? existingOrderResult[0] : null;
+    
+    if (!existingOrder) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Order not found or does not belong to this supplier'
+      });
+    }
 
     // First, delete existing items
-    await prisma.supplierOrderItem.deleteMany({
-      where: { supplierOrderId: orderId },
-    });
+    await prisma.$executeRaw`
+      DELETE FROM "SupplierOrderItem" WHERE "supplierOrderId" = ${orderId}
+    `;
 
-    // Update the order and create new items
-    const order = await prisma.supplierOrder.update({
-      where: { id: orderId },
+    // Update the order
+    const now = new Date();
+    await prisma.$executeRaw`
+      UPDATE "SupplierOrder" 
+      SET 
+        status = ${data.status || existingOrder.status},
+        total = ${data.totalAmount || existingOrder.total},
+        notes = ${data.notes || existingOrder.notes},
+        "updatedAt" = ${now}
+      WHERE id = ${orderId}
+    `;
+    
+    // Create new items
+    for (const item of data.items) {
+      const itemId = uuidv4();
+      await prisma.$executeRaw`
+        INSERT INTO "SupplierOrderItem" (
+          id, 
+          "supplierOrderId", 
+          "productName", 
+          sku, 
+          quantity, 
+          price, 
+          total, 
+          notes, 
+          "createdAt", 
+          "updatedAt"
+        ) VALUES (
+          ${itemId},
+          ${orderId},
+          ${item.productName},
+          ${item.sku || null},
+          ${item.quantity},
+          ${item.unitPrice || 0},
+          ${item.totalPrice || 0},
+          ${item.notes || null},
+          ${now},
+          ${now}
+        )
+      `;
+    }
+    
+    // Get the updated order with items
+    const orderResult = await prisma.$queryRaw`
+      SELECT * FROM "SupplierOrder" WHERE id = ${orderId}
+    `;
+    
+    const order = Array.isArray(orderResult) && orderResult.length > 0 ? orderResult[0] : null;
+    
+    // Get items for the order
+    const items = await prisma.$queryRaw`
+      SELECT * FROM "SupplierOrderItem" WHERE "supplierOrderId" = ${orderId}
+    `;
+    
+    const orderWithItems = {
+      ...order,
+      items: Array.isArray(items) ? items : []
+    };
+
+    res.json({
+      status: 'success',
       data: {
-        status: data.status,
-        totalAmount: new Prisma.Decimal(data.totalAmount || 0),
-        expectedDeliveryDate: data.expectedDeliveryDate ? new Date(data.expectedDeliveryDate) : null,
-        deliveredDate: data.deliveredDate ? new Date(data.deliveredDate) : null,
-        notes: data.notes,
-        items: {
-          create: data.items.map((item: any) => ({
-            productName: item.productName,
-            quantity: item.quantity,
-            unitPrice: new Prisma.Decimal(item.unitPrice || 0),
-            totalPrice: new Prisma.Decimal(item.totalPrice || 0),
-            notes: item.notes,
-          })),
-        },
-      },
-      include: {
-        items: true,
-      },
+        item: orderWithItems
+      }
     });
-
-    res.json(order);
   } catch (error: any) {
     console.error('Error updating supplier order:', error);
     res.status(500).json({ 
-      error: 'Failed to update supplier order',
+      status: 'error',
+      message: 'Failed to update supplier order',
       details: error.message 
     });
   }
@@ -137,14 +358,45 @@ router.put('/:supplierId/orders/:orderId', requireAdmin, async (req, res) => {
 // Delete an order
 router.delete('/:supplierId/orders/:orderId', requireAdmin, async (req, res) => {
   try {
-    const { orderId } = req.params;
-    await prisma.supplierOrder.delete({
-      where: { id: orderId },
+    const { supplierId, orderId } = req.params;
+    
+    // Check if order exists and belongs to this supplier
+    const existingOrderResult = await prisma.$queryRaw`
+      SELECT * FROM "SupplierOrder" 
+      WHERE id = ${orderId} AND "supplierId" = ${supplierId}
+    `;
+    
+    const existingOrder = Array.isArray(existingOrderResult) && existingOrderResult.length > 0 ? existingOrderResult[0] : null;
+    
+    if (!existingOrder) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Order not found or does not belong to this supplier'
+      });
+    }
+    
+    // First delete all items
+    await prisma.$executeRaw`
+      DELETE FROM "SupplierOrderItem" WHERE "supplierOrderId" = ${orderId}
+    `;
+    
+    // Then delete the order
+    await prisma.$executeRaw`
+      DELETE FROM "SupplierOrder" WHERE id = ${orderId}
+    `;
+    
+    res.json({
+      status: 'success',
+      data: null,
+      message: 'Supplier order deleted successfully'
     });
-    res.status(204).end();
   } catch (error) {
     console.error('Error deleting supplier order:', error);
-    res.status(500).json({ error: 'Failed to delete supplier order' });
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to delete supplier order',
+      details: error instanceof Error ? error.message : undefined
+    });
   }
 });
 

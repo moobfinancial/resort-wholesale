@@ -4,12 +4,16 @@ declare global {
   var prisma: PrismaClient | undefined;
 }
 
-// Create Prisma client with better error handling
-export const prisma = global.prisma || 
-  new PrismaClient({
+// Create a new PrismaClient instance with better logging
+const createPrismaClient = () => {
+  return new PrismaClient({
     log: ['error', 'warn'],
     errorFormat: 'pretty',
   });
+};
+
+// Create Prisma client with better error handling
+export const prisma = global.prisma || createPrismaClient();
 
 // Initialize connection with retry mechanism
 async function connectWithRetry(retries = 5, delay = 2000) {
@@ -35,12 +39,25 @@ async function connectWithRetry(retries = 5, delay = 2000) {
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
+  return false;
 }
 
-// Call the connection function but don't wait for it
-connectWithRetry().catch(err => {
+// Wait for initial database connection when the module is loaded
+export const prismaConnected = connectWithRetry().catch(err => {
   console.error('Failed to establish database connection:', err);
+  return false;
 });
+
+// Export a function to check if Prisma is connected
+export const isPrismaConnected = async () => {
+  try {
+    await prisma.$queryRaw`SELECT 1 as result`;
+    return true;
+  } catch (error) {
+    console.error('Prisma connection check failed:', error);
+    return false;
+  }
+};
 
 if (process.env.NODE_ENV !== 'production') {
   global.prisma = prisma;

@@ -1,6 +1,34 @@
 import { prisma } from '../../lib/prisma';
 import type { ProductVariant } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import crypto from 'crypto';
+
+/**
+ * Utility function to normalize image URLs to ensure consistent path formats
+ */
+const normalizeImageUrl = (imageUrl?: string | null): string => {
+  if (!imageUrl) return '/images/products/placeholder.svg';
+  
+  // If URL is already properly formatted, return it
+  if (imageUrl.startsWith('/images/products/') || imageUrl.startsWith('http')) {
+    return imageUrl;
+  }
+  
+  // If URL is a relative path starting with images/ but missing the leading slash
+  if (imageUrl.startsWith('images/products/')) {
+    return '/' + imageUrl;
+  }
+  
+  // If URL is from the old uploads path format
+  if (imageUrl.startsWith('/uploads/products/') || imageUrl.startsWith('uploads/products/')) {
+    const filename = imageUrl.split('/').pop();
+    return `/images/products/${filename || 'placeholder.svg'}`;
+  }
+  
+  // If URL is just a filename or a non-standard path
+  const filename = imageUrl.split('/').pop();
+  return `/images/products/${filename || 'placeholder.svg'}`;
+};
 
 type ProductVariantInput = {
   id?: string;
@@ -51,18 +79,20 @@ export const productVariantService = {
    */
   async create(data: ProductVariantInput): Promise<ProductVariant | null> {
     try {
-      return await prisma.productVariant.create({
+      const variant = await prisma.productVariant.create({
         data: {
-          id: crypto.randomUUID(), // Generate a unique ID
+          id: crypto.randomUUID(),
           productId: data.productId,
           sku: data.sku,
-          price: data.price,
+          price: new Decimal(data.price.toString()),
           stock: data.stock,
           attributes: data.attributes,
-          imageUrl: data.imageUrl,
-          updatedAt: new Date(), // Add updatedAt field
+          imageUrl: normalizeImageUrl(data.imageUrl),
+          updatedAt: new Date(),
         }
       });
+
+      return variant;
     } catch (error) {
       console.error('Error creating product variant:', error);
       return null;
@@ -74,17 +104,19 @@ export const productVariantService = {
    */
   async update(data: ProductVariantUpdateInput): Promise<ProductVariant | null> {
     try {
-      return await prisma.productVariant.update({
+      const variant = await prisma.productVariant.update({
         where: { id: data.id },
         data: {
-          sku: data.sku,
-          price: data.price,
-          stock: data.stock,
-          attributes: data.attributes,
-          imageUrl: data.imageUrl,
-          updatedAt: new Date(), // Add updatedAt field
+          ...(data.sku && { sku: data.sku }),
+          ...(data.price && { price: new Decimal(data.price.toString()) }),
+          ...(data.stock && { stock: data.stock }),
+          ...(data.attributes && { attributes: data.attributes }),
+          ...(data.imageUrl && { imageUrl: normalizeImageUrl(data.imageUrl) }),
+          updatedAt: new Date(),
         }
       });
+
+      return variant;
     } catch (error) {
       console.error(`Error updating product variant with ID ${data.id}:`, error);
       return null;
@@ -145,25 +177,25 @@ export const productVariantService = {
               where: { id: variant.id },
               data: {
                 sku: variant.sku,
-                price: variant.price,
+                price: new Decimal(variant.price.toString()),
                 stock: variant.stock,
                 attributes: variant.attributes,
-                imageUrl: variant.imageUrl,
-                updatedAt: new Date(), // Add updatedAt field
+                imageUrl: normalizeImageUrl(variant.imageUrl),
+                updatedAt: new Date(),
               }
             });
           } else {
             // Create new variant
             await tx.productVariant.create({
               data: {
-                id: crypto.randomUUID(), // Generate a unique ID
+                id: crypto.randomUUID(),
                 productId,
                 sku: variant.sku,
-                price: variant.price,
+                price: new Decimal(variant.price.toString()),
                 stock: variant.stock,
                 attributes: variant.attributes,
-                imageUrl: variant.imageUrl,
-                updatedAt: new Date(), // Add updatedAt field
+                imageUrl: normalizeImageUrl(variant.imageUrl),
+                updatedAt: new Date(),
               }
             });
           }
@@ -172,7 +204,7 @@ export const productVariantService = {
       
       return true;
     } catch (error) {
-      console.error(`Error updating variants for product ${productId}:`, error);
+      console.error('Error updating product variants:', error);
       return false;
     }
   }

@@ -5,6 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { requireAdmin } from '../middleware/auth';
 
 const log = debug('app:collections');
 const router = express.Router();
@@ -13,13 +14,20 @@ const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Ensure upload directories exist
+const uploadDir = path.join(process.cwd(), 'uploads', 'collections');
+const publicDir = path.join(process.cwd(), 'public', 'images', 'collections');
+
+// Create directories if they don't exist
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../../../uploads/collections');
-    // Create directory if it doesn't exist
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
@@ -35,23 +43,21 @@ const upload = multer({ storage });
 router.get('/active', async (req, res) => {
   log('GET /active called');
   try {
-    const collections = await collectionService.getActiveCollections();
-    
-    const formattedCollections = collections.map(collection => ({
-      ...collection,
-      productCount: collection._count.products,
-      _count: undefined,
-    }));
-
+    const result = await collectionService.getActiveCollections();
+    if (result.status === 'error') {
+      return res.status(500).json(result);
+    }
     res.json({
       status: 'success',
-      data: formattedCollections,
+      data: {
+        items: result.data?.items || []
+      }
     });
   } catch (error) {
     console.error('Get active collections error:', error);
     res.status(500).json({
       status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to get active collections',
+      message: error instanceof Error ? error.message : 'Failed to get active collections'
     });
   }
 });
@@ -62,21 +68,32 @@ router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
-
+    
     const result = await collectionService.listCollections({
       page,
       limit,
+      orderBy: { createdAt: 'desc' },
     });
 
+    if (result.status === 'error') {
+      return res.status(500).json(result);
+    }
+    
     res.json({
       status: 'success',
-      data: result,
+      data: {
+        items: result.data?.items || [],
+        total: result.data?.total || 0,
+        page: result.data?.page || 1,
+        limit: result.data?.limit || 10,
+        totalPages: result.data?.totalPages || 0
+      }
     });
   } catch (error) {
     console.error('List collections error:', error);
     res.status(500).json({
       status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to list collections',
+      message: error instanceof Error ? error.message : 'Failed to list collections'
     });
   }
 });
@@ -86,24 +103,23 @@ router.get('/:id', async (req, res) => {
   log('GET /:id called');
   try {
     const { id } = req.params;
-    const collection = await collectionService.getCollection(id);
+    const result = await collectionService.getCollection(id);
 
-    if (!collection) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Collection not found',
-      });
+    if (result.status === 'error') {
+      return res.status(404).json(result);
     }
 
     res.json({
       status: 'success',
-      data: collection,
+      data: {
+        item: result.data?.item || null
+      }
     });
   } catch (error) {
     console.error('Get collection error:', error);
     res.status(500).json({
       status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to get collection',
+      message: error instanceof Error ? error.message : 'Failed to get collection'
     });
   }
 });
@@ -113,23 +129,29 @@ router.get('/:id/products', async (req, res) => {
   log('GET /:id/products called');
   try {
     const { id } = req.params;
-    const products = await collectionService.getCollectionProducts(id);
+    const result = await collectionService.getCollectionProducts(id);
+    
+    if (result.status === 'error') {
+      return res.status(500).json(result);
+    }
 
     res.json({
       status: 'success',
-      data: products,
+      data: {
+        items: result.data?.items || []
+      }
     });
   } catch (error) {
     console.error('Get collection products error:', error);
     res.status(500).json({
       status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to get collection products',
+      message: error instanceof Error ? error.message : 'Failed to get collection products'
     });
   }
 });
 
 // Create a new collection
-router.post('/', upload.single('image'), async (req, res) => {
+router.post('/', requireAdmin, upload.single('image'), async (req, res) => {
   log('POST / called');
   try {
     const { name, description, isActive } = req.body;
@@ -139,260 +161,154 @@ router.post('/', upload.single('image'), async (req, res) => {
     log('File:', req.file);
 
     if (req.file) {
-      // Save to uploads directory (already done by multer)
-      const uploadPath = `/uploads/collections/${req.file.filename}`;
-      
       // Copy to public directory for frontend access
-      const publicDir = path.join(process.cwd(), 'public', 'images', 'collections');
       const publicPath = path.join(publicDir, req.file.filename);
-      
-      // Ensure the public directory exists
-      if (!fs.existsSync(publicDir)) {
-        fs.mkdirSync(publicDir, { recursive: true });
-      }
-      
-      // Copy the file from uploads to public
-      fs.copyFileSync(
-        path.join(process.cwd(), 'uploads', 'collections', req.file.filename),
-        publicPath
-      );
+      fs.copyFileSync(req.file.path, publicPath);
       
       // Set the imageUrl to the format expected by the frontend
       imageUrl = `/images/collections/${req.file.filename}`;
     }
 
-    const collection = await collectionService.createCollection({
+    const result = await collectionService.createCollection({
       name,
       description,
       imageUrl,
       isActive: isActive === 'true',
     });
 
+    if (result.status === 'error') {
+      return res.status(400).json(result);
+    }
+
     res.status(201).json({
       status: 'success',
-      data: collection,
+      data: {
+        item: result.data?.item || null
+      }
     });
   } catch (error) {
     console.error('Create collection error:', error);
     log('Create collection error details:', error instanceof Error ? error.stack : error);
     res.status(500).json({
       status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to create collection',
+      message: error instanceof Error ? error.message : 'Failed to create collection'
     });
   }
 });
 
 // Update a collection
-router.put('/:id', upload.single('image'), async (req, res) => {
+router.put('/:id', requireAdmin, upload.single('image'), async (req, res) => {
   log('PUT /:id called');
   try {
     const { id } = req.params;
     const { name, description, isActive } = req.body;
-    
-    // Check if collection exists
-    const existingCollection = await collectionService.getCollection(id);
+    let imageUrl = undefined;
 
-    if (!existingCollection) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Collection not found',
-      });
-    }
-
-    // Prepare update data
-    const updateData: any = {
-      name,
-      description,
-      isActive: isActive === 'true',
-    };
-
-    // If a new image was uploaded, update the imageUrl
     if (req.file) {
-      // Save to uploads directory (already done by multer)
-      const uploadPath = `/uploads/collections/${req.file.filename}`;
-      
       // Copy to public directory for frontend access
-      const publicDir = path.join(process.cwd(), 'public', 'images', 'collections');
       const publicPath = path.join(publicDir, req.file.filename);
-      
-      // Ensure the public directory exists
-      if (!fs.existsSync(publicDir)) {
-        fs.mkdirSync(publicDir, { recursive: true });
-      }
-      
-      // Copy the file from uploads to public
-      fs.copyFileSync(
-        path.join(process.cwd(), 'uploads', 'collections', req.file.filename),
-        publicPath
-      );
+      fs.copyFileSync(req.file.path, publicPath);
       
       // Set the imageUrl to the format expected by the frontend
-      updateData.imageUrl = `/images/collections/${req.file.filename}`;
-      
-      // Delete old image if it exists
-      if (existingCollection.imageUrl) {
-        // Delete from uploads directory
-        const oldUploadPath = path.join(
-          process.cwd(), 
-          'uploads', 
-          existingCollection.imageUrl.replace(/^\/images/, 'collections')
-        );
-        
-        if (fs.existsSync(oldUploadPath)) {
-          fs.unlinkSync(oldUploadPath);
-        }
-        
-        // Delete from public directory
-        const oldPublicPath = path.join(
-          process.cwd(),
-          'public',
-          existingCollection.imageUrl
-        );
-        
-        if (fs.existsSync(oldPublicPath)) {
-          fs.unlinkSync(oldPublicPath);
-        }
-      }
+      imageUrl = `/images/collections/${req.file.filename}`;
     }
 
-    // Update the collection
-    const updatedCollection = await collectionService.updateCollection(id, updateData);
+    const result = await collectionService.updateCollection(id, {
+      name,
+      description,
+      imageUrl,
+      isActive: isActive === 'true',
+    });
+
+    if (result.status === 'error') {
+      return res.status(400).json(result);
+    }
 
     res.json({
       status: 'success',
-      data: updatedCollection,
+      data: {
+        item: result.data?.item || null
+      }
     });
   } catch (error) {
     console.error('Update collection error:', error);
     res.status(500).json({
       status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to update collection',
-    });
-  }
-});
-
-// Add products to a collection
-router.post('/:id/products', async (req, res) => {
-  log('POST /:id/products called');
-  try {
-    const { id } = req.params;
-    const { productIds } = req.body;
-    
-    log('Request body:', req.body);
-    log('Product IDs:', productIds);
-    
-    if (!Array.isArray(productIds) || productIds.length === 0) {
-      log('Invalid product IDs:', productIds);
-      return res.status(400).json({
-        status: 'error',
-        message: 'Product IDs are required',
-      });
-    }
-
-    // Check if collection exists
-    const existingCollection = await collectionService.getCollection(id);
-    log('Existing collection:', existingCollection);
-
-    if (!existingCollection) {
-      log('Collection not found:', id);
-      return res.status(404).json({
-        status: 'error',
-        message: 'Collection not found',
-      });
-    }
-
-    // Add products to collection
-    log('Adding products to collection:', productIds);
-    const result = await collectionService.addProductsToCollection(id, productIds);
-    log('Add products result:', result);
-
-    res.json({
-      status: 'success',
-      data: result,
-    });
-  } catch (error) {
-    console.error('Add products to collection error:', error);
-    log('Add products to collection error details:', error instanceof Error ? error.stack : error);
-    res.status(500).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to add products to collection',
-    });
-  }
-});
-
-// Remove a product from a collection
-router.delete('/:id/products/:productId', async (req, res) => {
-  log('DELETE /:id/products/:productId called');
-  try {
-    const { id, productId } = req.params;
-    
-    // Check if collection exists
-    const existingCollection = await collectionService.getCollection(id);
-
-    if (!existingCollection) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Collection not found',
-      });
-    }
-
-    // Remove product from collection
-    await collectionService.removeProductFromCollection(id, productId);
-
-    res.json({
-      status: 'success',
-      message: 'Product removed from collection successfully',
-    });
-  } catch (error) {
-    console.error('Remove product from collection error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to remove product from collection',
+      message: error instanceof Error ? error.message : 'Failed to update collection'
     });
   }
 });
 
 // Delete a collection
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   log('DELETE /:id called');
   try {
     const { id } = req.params;
-    
-    // Check if collection exists
-    const existingCollection = await collectionService.getCollection(id);
+    const result = await collectionService.deleteCollection(id);
 
-    if (!existingCollection) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Collection not found',
-      });
+    if (result.status === 'error') {
+      return res.status(400).json(result);
     }
-
-    // Delete the collection's image if it exists
-    if (existingCollection.imageUrl) {
-      const imagePath = path.join(
-        __dirname, 
-        '../../../uploads', 
-        existingCollection.imageUrl.replace(/^\/uploads/, '')
-      );
-      
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-      }
-    }
-
-    // Delete the collection
-    await collectionService.deleteCollection(id);
 
     res.json({
       status: 'success',
-      message: 'Collection deleted successfully',
+      data: null
     });
   } catch (error) {
     console.error('Delete collection error:', error);
     res.status(500).json({
       status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to delete collection',
+      message: error instanceof Error ? error.message : 'Failed to delete collection'
+    });
+  }
+});
+
+// Add products to a collection
+router.post('/:id/products', requireAdmin, async (req, res) => {
+  log('POST /:id/products called');
+  try {
+    const { id } = req.params;
+    const { productIds } = req.body;
+
+    const result = await collectionService.addProductsToCollection(id, productIds);
+
+    if (result.status === 'error') {
+      return res.status(400).json(result);
+    }
+
+    res.json({
+      status: 'success',
+      data: null
+    });
+  } catch (error) {
+    console.error('Add products to collection error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Failed to add products to collection'
+    });
+  }
+});
+
+// Remove product from a collection
+router.delete('/:collectionId/products/:productId', requireAdmin, async (req, res) => {
+  log('DELETE /:collectionId/products/:productId called');
+  try {
+    const { collectionId, productId } = req.params;
+    const result = await collectionService.removeProductFromCollection(collectionId, productId);
+
+    if (result.status === 'error') {
+      return res.status(400).json(result);
+    }
+
+    res.json({
+      status: 'success',
+      data: null
+    });
+  } catch (error) {
+    console.error('Remove product from collection error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Failed to remove product from collection'
     });
   }
 });

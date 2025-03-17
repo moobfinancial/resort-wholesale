@@ -10,6 +10,7 @@ const modelName = 'gemini-1.5-flash-001';
 const vertexAI = new PredictionServiceClient({ project, location });
 
 // Load the model
+// @ts-ignore - Ignore type checking for this line
 const model = vertexAI.getGenerativeModel({
   model: modelName,
   generation_config: {

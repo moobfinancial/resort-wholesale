@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useCustomerAuthStore } from '../stores/customerAuth';
 
 export interface BusinessFormData {
   businessName: string;
   businessAddress: string;
+  businessCity: string;
+  businessState: string;
+  businessZipCode: string;
+  businessCountry: string;
   businessPhone: string;
   businessEmail: string;
   taxId: string;
@@ -21,6 +25,14 @@ const validateField = (name: string, value: string): string => {
       return value.length < 2 ? 'Business name must be at least 2 characters' : '';
     case 'businessAddress':
       return value.length < 5 ? 'Please enter a valid address' : '';
+    case 'businessCity':
+      return value.length < 2 ? 'Please enter a valid city' : '';
+    case 'businessState':
+      return value.length < 2 ? 'Please enter a valid state' : '';
+    case 'businessZipCode':
+      return value.length < 5 ? 'Please enter a valid zip code' : '';
+    case 'businessCountry':
+      return value.length < 2 ? 'Please enter a valid country' : '';
     case 'businessPhone':
       return /^\+?[\d\s-()]{10,}$/.test(value) ? '' : 'Please enter a valid phone number';
     case 'businessEmail':
@@ -43,18 +55,22 @@ interface UseBusinessFormReturn {
   handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleSubmit: () => Promise<void>;
   resetStatus: () => void;
+  resetForm: (data?: Partial<BusinessFormData>) => void;
 }
 
 export function useBusinessForm(initialData?: Partial<BusinessFormData>): UseBusinessFormReturn {
   const [formData, setFormData] = useState<BusinessFormData>({
     businessName: '',
     businessAddress: '',
+    businessCity: '',
+    businessState: '',
+    businessZipCode: '',
+    businessCountry: '',
     businessPhone: '',
     businessEmail: '',
     taxId: '',
     businessType: '',
     registrationNumber: '',
-    ...initialData
   });
 
   const [errors, setErrors] = useState<ValidationError>({});
@@ -112,10 +128,10 @@ export function useBusinessForm(initialData?: Partial<BusinessFormData>): UseBus
         taxId: formData.taxId,
         address: {
           street: formData.businessAddress,
-          city: "", // Add empty values for required fields
-          state: "",
-          zipCode: "",
-          country: ""
+          city: formData.businessCity,
+          state: formData.businessState,
+          zipCode: formData.businessZipCode,
+          country: formData.businessCountry
         }
       };
 
@@ -130,9 +146,26 @@ export function useBusinessForm(initialData?: Partial<BusinessFormData>): UseBus
         body: JSON.stringify(transformedData)
       });
 
+      const responseData = await response.json();
+      
       if (!response.ok) {
-        const errorResponse = await response.json();
-        throw new Error(errorResponse.error || 'Failed to update business information');
+        throw new Error(responseData.message || 'Failed to update business information');
+      }
+
+      if (responseData.status !== 'success') {
+        throw new Error(responseData.message || 'Failed to update business information');
+      }
+
+      // Update the customer auth store with the latest business information
+      const { updateBusinessInfo } = useCustomerAuthStore.getState();
+      if (updateBusinessInfo && responseData.data && responseData.data.customer) {
+        updateBusinessInfo({
+          companyName: responseData.data.customer.companyName,
+          businessType: responseData.data.customer.businessType,
+          taxId: responseData.data.customer.taxId,
+          phone: responseData.data.customer.phone,
+          address: responseData.data.customer.address
+        });
       }
 
       setIsSuccess(true);
@@ -149,6 +182,23 @@ export function useBusinessForm(initialData?: Partial<BusinessFormData>): UseBus
     setErrorMessage(null);
   };
 
+  const resetForm = useCallback((data?: Partial<BusinessFormData>) => {
+    setFormData({
+      businessName: data?.businessName || '',
+      businessAddress: data?.businessAddress || '',
+      businessCity: data?.businessCity || '',
+      businessState: data?.businessState || '',
+      businessZipCode: data?.businessZipCode || '',
+      businessCountry: data?.businessCountry || '',
+      businessPhone: data?.businessPhone || '',
+      businessEmail: data?.businessEmail || '',
+      taxId: data?.taxId || '',
+      businessType: data?.businessType || '',
+      registrationNumber: data?.registrationNumber || '',
+    });
+    setErrors({});
+  }, []);
+
   return {
     formData,
     errors,
@@ -157,6 +207,7 @@ export function useBusinessForm(initialData?: Partial<BusinessFormData>): UseBus
     errorMessage,
     handleInputChange,
     handleSubmit,
-    resetStatus
+    resetStatus,
+    resetForm
   };
 }

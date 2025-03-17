@@ -29,15 +29,24 @@ router.get('/:productId/bulk-pricing', async (req, res) => {
     });
     
     if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ 
+        status: 'error',
+        message: 'Product not found' 
+      });
     }
     
     const tiers = await bulkPricingService.getByProductId(productId);
     
-    return res.json({ tiers });
+    return res.json({ 
+      status: 'success',
+      data: { tiers } 
+    });
   } catch (error) {
     console.error('Error fetching bulk pricing tiers:', error);
-    return res.status(500).json({ message: 'Error fetching bulk pricing tiers' });
+    return res.status(500).json({ 
+      status: 'error',
+      message: 'Error fetching bulk pricing tiers' 
+    });
   }
 });
 
@@ -55,30 +64,46 @@ router.post('/:productId/bulk-pricing', requireAuth, async (req, res) => {
     });
     
     if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ 
+        status: 'error',
+        message: 'Product not found' 
+      });
     }
     
     // Update pricing tiers
     const success = await bulkPricingService.updateProductTiers(productId, tiers);
     
     if (!success) {
-      return res.status(500).json({ message: 'Failed to update bulk pricing tiers' });
+      return res.status(500).json({ 
+        status: 'error',
+        message: 'Failed to update bulk pricing tiers' 
+      });
     }
     
     // Get updated tiers to return
     const updatedTiers = await bulkPricingService.getByProductId(productId);
     
     return res.json({ 
-      message: 'Bulk pricing tiers updated successfully',
-      tiers: updatedTiers
+      status: 'success',
+      data: {
+        message: 'Bulk pricing tiers updated successfully',
+        tiers: updatedTiers
+      }
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'Invalid input data', errors: error.errors });
+      return res.status(400).json({ 
+        status: 'error',
+        message: 'Invalid input data', 
+        details: error.errors 
+      });
     }
     
     console.error('Error updating bulk pricing tiers:', error);
-    return res.status(500).json({ message: 'Error updating bulk pricing tiers' });
+    return res.status(500).json({ 
+      status: 'error',
+      message: 'Error updating bulk pricing tiers' 
+    });
   }
 });
 
@@ -96,7 +121,10 @@ router.post('/:productId/bulk-pricing/tier', requireAuth, async (req, res) => {
     });
     
     if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ 
+        status: 'error',
+        message: 'Product not found' 
+      });
     }
     
     // Check if a tier with this minimum quantity already exists
@@ -108,24 +136,40 @@ router.post('/:productId/bulk-pricing/tier', requireAuth, async (req, res) => {
     });
     
     if (existingTier) {
-      return res.status(400).json({ message: 'A pricing tier with this minimum quantity already exists' });
+      return res.status(400).json({ 
+        status: 'error',
+        message: 'A pricing tier with this minimum quantity already exists' 
+      });
     }
     
     // Add new tier
     const tier = await bulkPricingService.addTier(productId, tierData);
     
     if (!tier) {
-      return res.status(500).json({ message: 'Failed to add pricing tier' });
+      return res.status(500).json({ 
+        status: 'error',
+        message: 'Failed to add pricing tier' 
+      });
     }
     
-    return res.status(201).json(tier);
+    return res.status(201).json({
+      status: 'success',
+      data: tier
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'Invalid input data', errors: error.errors });
+      return res.status(400).json({ 
+        status: 'error',
+        message: 'Invalid input data', 
+        details: error.errors 
+      });
     }
     
     console.error('Error adding pricing tier:', error);
-    return res.status(500).json({ message: 'Error adding pricing tier' });
+    return res.status(500).json({ 
+      status: 'error',
+      message: 'Error adding pricing tier' 
+    });
   }
 });
 
@@ -143,7 +187,10 @@ router.put('/:productId/bulk-pricing/tier/:tierId', requireAuth, async (req, res
     });
     
     if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ 
+        status: 'error',
+        message: 'Product not found' 
+      });
     }
     
     // Verify tier exists and belongs to the product
@@ -155,7 +202,10 @@ router.put('/:productId/bulk-pricing/tier/:tierId', requireAuth, async (req, res
     });
     
     if (!existingTier) {
-      return res.status(404).json({ message: 'Pricing tier not found or does not belong to this product' });
+      return res.status(404).json({ 
+        status: 'error',
+        message: 'Pricing tier not found or does not belong to this product' 
+      });
     }
     
     // Check if changing to a minimum quantity that already exists
@@ -169,7 +219,10 @@ router.put('/:productId/bulk-pricing/tier/:tierId', requireAuth, async (req, res
       });
       
       if (duplicateTier) {
-        return res.status(400).json({ message: 'A pricing tier with this minimum quantity already exists' });
+        return res.status(400).json({ 
+          status: 'error',
+          message: 'A pricing tier with this minimum quantity already exists' 
+        });
       }
     }
     
@@ -177,17 +230,30 @@ router.put('/:productId/bulk-pricing/tier/:tierId', requireAuth, async (req, res
     const tier = await bulkPricingService.updateTier(tierId, tierData);
     
     if (!tier) {
-      return res.status(500).json({ message: 'Failed to update pricing tier' });
+      return res.status(500).json({ 
+        status: 'error',
+        message: 'Failed to update pricing tier' 
+      });
     }
     
-    return res.json(tier);
+    return res.json({
+      status: 'success',
+      data: tier
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: 'Invalid input data', errors: error.errors });
+      return res.status(400).json({ 
+        status: 'error',
+        message: 'Invalid input data', 
+        details: error.errors 
+      });
     }
     
     console.error('Error updating pricing tier:', error);
-    return res.status(500).json({ message: 'Error updating pricing tier' });
+    return res.status(500).json({ 
+      status: 'error',
+      message: 'Error updating pricing tier' 
+    });
   }
 });
 
@@ -202,7 +268,10 @@ router.delete('/:productId/bulk-pricing/tier/:tierId', requireAuth, async (req, 
     });
     
     if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ 
+        status: 'error',
+        message: 'Product not found' 
+      });
     }
     
     // Verify tier exists and belongs to the product
@@ -214,20 +283,32 @@ router.delete('/:productId/bulk-pricing/tier/:tierId', requireAuth, async (req, 
     });
     
     if (!existingTier) {
-      return res.status(404).json({ message: 'Pricing tier not found or does not belong to this product' });
+      return res.status(404).json({ 
+        status: 'error',
+        message: 'Pricing tier not found or does not belong to this product' 
+      });
     }
     
     // Delete tier
-    const success = await bulkPricingService.deleteTier(tierId);
+    const result = await bulkPricingService.deleteTier(tierId);
     
-    if (!success) {
-      return res.status(500).json({ message: 'Failed to delete pricing tier' });
+    if (!result) {
+      return res.status(500).json({ 
+        status: 'error',
+        message: 'Failed to delete pricing tier' 
+      });
     }
     
-    return res.json({ message: 'Pricing tier deleted successfully' });
+    return res.json({
+      status: 'success',
+      data: { message: 'Pricing tier deleted successfully' }
+    });
   } catch (error) {
     console.error('Error deleting pricing tier:', error);
-    return res.status(500).json({ message: 'Error deleting pricing tier' });
+    return res.status(500).json({ 
+      status: 'error',
+      message: 'Error deleting pricing tier' 
+    });
   }
 });
 
@@ -238,7 +319,10 @@ router.get('/:productId/price', async (req, res) => {
     const quantity = parseInt(req.query.quantity as string, 10);
     
     if (isNaN(quantity) || quantity <= 0) {
-      return res.status(400).json({ message: 'Invalid quantity. Must be a positive number.' });
+      return res.status(400).json({ 
+        status: 'error',
+        message: 'Invalid quantity. Must be a positive number.' 
+      });
     }
     
     // Verify product exists
@@ -247,16 +331,25 @@ router.get('/:productId/price', async (req, res) => {
     });
     
     if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ 
+        status: 'error',
+        message: 'Product not found' 
+      });
     }
     
     // Calculate price based on bulk pricing tiers
     const price = await bulkPricingService.calculatePriceForQuantity(productId, quantity);
     
-    return res.json({ price });
+    return res.json({
+      status: 'success',
+      data: { price }
+    });
   } catch (error) {
     console.error('Error calculating price:', error);
-    return res.status(500).json({ message: 'Error calculating price' });
+    return res.status(500).json({ 
+      status: 'error',
+      message: 'Error calculating price' 
+    });
   }
 });
 

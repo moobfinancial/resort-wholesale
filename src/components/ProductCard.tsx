@@ -40,7 +40,7 @@ export default function ProductCard({ product, pricingMode = 'retail' }: Product
     <Link to={`/products/${product.id}`} className="group h-80">
       <div className="w-full h-64 aspect-w-1 aspect-h-1 bg-gray-200 rounded-lg overflow-hidden xl:aspect-w-7 xl:aspect-h-8">
         <img
-          src={product.imageUrl || '/images/products/placeholder.svg'}
+          src={product.imageUrl || '/images/products/placeholder.jpg'}
           alt={product.name}
           className="w-full h-full object-center object-cover group-hover:opacity-75"
           onError={(e) => {
@@ -54,28 +54,28 @@ export default function ProductCard({ product, pricingMode = 'retail' }: Product
               return;
             }
             
-            // Try different image paths in sequence
+            // Standardized image loading pattern
             if (product.imageUrl) {
               const filename = product.imageUrl.split('/').pop();
-              if (filename) {
-                // Try with /uploads/products/ path first
-                if (!currentSrc.includes('/uploads/products/')) {
-                  console.log('Trying with /uploads/products/ path');
-                  target.src = `/uploads/products/${filename}`;
-                  return; // Exit early to give this a chance to load
-                }
-                // Then try with /images/products/ path 
-                else if (!currentSrc.includes('/images/products/')) {
-                  console.log('Trying with /images/products/ path');
-                  target.src = `/images/products/${filename}`;
-                  return; // Exit early to give this a chance to load
-                }
+              
+              // Step 1: If not already using /images/products/ path, try that first
+              if (!currentSrc.includes('/images/products/')) {
+                console.log('Trying with /images/products/ path');
+                target.src = `/images/products/${filename || ''}`;
+                return; // Exit early to give this a chance to load
+              }
+              
+              // Step 2: If that failed, try with /uploads/products/ path
+              else if (!currentSrc.includes('/uploads/products/')) {
+                console.log('Trying with /uploads/products/ path');
+                target.src = `/uploads/products/${filename || ''}`;
+                return; // Exit early to give this a chance to load
               }
             }
             
-            // Fallback to placeholder image
+            // Step 3: Final fallback to placeholder image
             console.log('Using placeholder image as final fallback');
-            target.src = '/images/products/placeholder.svg';
+            target.src = '/images/products/placeholder.jpg';
           }}
         />
       </div>

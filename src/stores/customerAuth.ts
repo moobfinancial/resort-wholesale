@@ -1,20 +1,30 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { API_BASE_URL } from '../config';
+import { useCartStore } from './cartStore';
+import { useGuestCartStore } from './guestCartStore';
 
 export interface CustomerUser {
   id: string;
   name: string;
   email: string;
-  status: 'PENDING' | 'VERIFIED' | 'REJECTED';
-  creditStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
-  creditLimit?: number;
-  availableCredit?: number;
+  firstName?: string;
+  lastName?: string;
   contactName?: string;
+  status?: string;
   phone?: string;
-  address?: string;
   businessType?: string;
   taxId?: string;
+  companyName?: string;
+  address?: {
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+  };
+  creditLimit?: number;
+  creditApproved?: boolean;
 }
 
 interface CustomerAuthState {
@@ -23,24 +33,39 @@ interface CustomerAuthState {
   user: CustomerUser | null;
   login: (email: string, password: string) => Promise<void>;
   register: (data: {
-    name: string;
+    firstName: string;
+    lastName: string;
     email: string;
     password: string;
   }) => Promise<void>;
   logout: () => void;
-  updateProfile: (data: Partial<CustomerUser>) => Promise<void>;
+  updateProfile: (data: Partial<CustomerUser>) => Promise<{ status: string; message: string }>;
+  updateBusinessInfo: (data: {
+    companyName?: string;
+    businessType?: string; 
+    taxId?: string;
+    phone?: string;
+    address?: {
+      street: string;
+      city: string;
+      state: string;
+      zipCode: string;
+      country: string;
+    };
+  }) => void;
 }
 
+// Create the store with stronger typing and safer initialization for React 18
 export const useCustomerAuthStore = create<CustomerAuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       token: null,
       isAuthenticated: false,
       user: null,
 
       login: async (email: string, password: string) => {
         try {
-          const response = await fetch(`${API_BASE_URL}/customers/login`, {
+          const response = await fetch(`${API_BASE_URL}/customer/auth/login`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -49,20 +74,63 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
             body: JSON.stringify({ email, password }),
           });
 
+          const responseData = await response.json();
+
           if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Login failed');
+            throw new Error(responseData.message || 'Login failed');
           }
 
-          const data = await response.json();
+          // Handle different response formats
+          let userData;
+          let tokenData;
+
+          if (responseData.status === 'success' && responseData.data) {
+            // New standardized format
+            userData = responseData.data.user;
+            tokenData = responseData.data.token;
+          } else if (responseData.token && responseData.user) {
+            // Legacy format - direct properties
+            userData = responseData.user;
+            tokenData = responseData.token;
+          } else {
+            throw new Error('Invalid response format');
+          }
+          
+          if (!userData) {
+            throw new Error('Invalid user data received');
+          }
+          
+          // Use a consistent way to handle the name
+          const displayName = userData.fullName || 
+                             (userData.firstName && userData.lastName) ? 
+                             `${userData.firstName} ${userData.lastName}` : 
+                             userData.contactName || 
+                             userData.email.split('@')[0];
+          
           set({
-            token: data.token,
+            token: tokenData,
             isAuthenticated: true,
-            user: data.user,
+            user: {
+              id: userData.id,
+              name: displayName,
+              email: userData.email,
+              firstName: userData.firstName,
+              lastName: userData.lastName,
+              contactName: userData.contactName,
+              status: userData.status,
+              phone: userData.phone || '',
+              businessType: userData.businessType || '',
+            },
           });
 
-          // Redirect to dashboard after successful login
-          window.location.href = '/customer/dashboard';
+          console.log('Login successful:', userData);
+          
+          // Transfer guest cart items to user cart if any exist
+          // Disable automatic transfer to avoid validation errors
+          // The Cart component will handle this transfer when needed
+          console.log('Login successful - cart transfer will be handled by Cart component');
+          
+          // No redirect - let the component handle it
         } catch (error) {
           console.error('Login error:', error);
           throw error;
@@ -71,7 +139,7 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
 
       register: async (data) => {
         try {
-          const response = await fetch(`${API_BASE_URL}/customers/register`, {
+          const response = await fetch(`${API_BASE_URL}/customer/auth/register`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -80,20 +148,61 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
             body: JSON.stringify(data),
           });
 
+          const responseData = await response.json();
+
           if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Registration failed');
+            throw new Error(responseData.message || 'Registration failed');
           }
 
-          const responseData = await response.json();
+          // Handle different response formats
+          let userData;
+          let tokenData;
+
+          if (responseData.status === 'success' && responseData.data) {
+            // New standardized format
+            userData = responseData.data.user;
+            tokenData = responseData.data.token;
+          } else if (responseData.token && responseData.user) {
+            // Legacy format - direct properties
+            userData = responseData.user;
+            tokenData = responseData.token;
+          } else {
+            throw new Error('Invalid response format');
+          }
+          
+          if (!userData) {
+            throw new Error('Invalid user data received');
+          }
+
+          // Use a consistent way to handle the name
+          const displayName = userData.fullName || 
+                             (userData.firstName && userData.lastName) ? 
+                             `${userData.firstName} ${userData.lastName}` : 
+                             userData.contactName || 
+                             userData.email.split('@')[0];
+          
           set({
-            token: responseData.token,
+            token: tokenData,
             isAuthenticated: true,
-            user: responseData.user,
+            user: {
+              id: userData.id,
+              name: displayName,
+              email: userData.email,
+              firstName: userData.firstName,
+              lastName: userData.lastName,
+              contactName: userData.contactName,
+              status: userData.status,
+            },
           });
 
-          // Redirect to dashboard after successful registration
-          window.location.href = '/customer/dashboard';
+          console.log('Registration successful:', userData);
+          
+          // Transfer guest cart items to user cart if any exist
+          // Disable automatic transfer to avoid validation errors
+          // The Cart component will handle this transfer when needed
+          console.log('Registration successful - cart transfer will be handled by Cart component');
+          
+          // No redirect - let the component handle it
         } catch (error) {
           console.error('Registration error:', error);
           throw error;
@@ -101,44 +210,110 @@ export const useCustomerAuthStore = create<CustomerAuthState>()(
       },
 
       updateProfile: async (data) => {
+        // Validate user is logged in
+        if (!get().isAuthenticated || !get().user) {
+          return {
+            status: 'error',
+            message: 'You must be logged in to update your profile',
+          };
+        }
+
         try {
-          const state = useCustomerAuthStore.getState();
           const response = await fetch(`${API_BASE_URL}/customer/auth/profile`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${state.token}`,
             },
             credentials: 'include',
             body: JSON.stringify(data),
           });
 
+          const responseData = await response.json();
+
           if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to update profile');
+            throw new Error(responseData.message || 'Profile update failed');
           }
 
-          const responseData = await response.json();
-          set((state) => ({
-            user: { ...state.user, ...responseData.data.user },
+          // Handle different response formats
+          let userData;
+
+          if (responseData.status === 'success' && responseData.data && responseData.data.user) {
+            // New standardized format
+            userData = responseData.data.user;
+          } else if (responseData.user) {
+            // Legacy format - direct properties
+            userData = responseData.user;
+          } else {
+            throw new Error('Invalid response format');
+          }
+          
+          if (!userData) {
+            throw new Error('Invalid user data received');
+          }
+
+          // Use a consistent way to handle the name
+          const displayName = userData.fullName || 
+                             (userData.firstName && userData.lastName) ? 
+                             `${userData.firstName} ${userData.lastName}` : 
+                             userData.contactName || 
+                             userData.email.split('@')[0];
+          
+          // Update user state with new information
+          set(state => ({
+            user: {
+              ...state.user as CustomerUser,
+              ...userData,
+              name: displayName
+            }
           }));
+          
+          return {
+            status: 'success',
+            message: 'Profile updated successfully',
+          };
         } catch (error) {
           console.error('Profile update error:', error);
-          throw error;
+          return {
+            status: 'error',
+            message: error instanceof Error ? error.message : 'Profile update failed',
+          };
         }
       },
 
+      updateBusinessInfo: (data) => {
+        const currentUser = get().user;
+        if (!currentUser) return;
+
+        set({
+          user: {
+            ...currentUser,
+            ...data,
+          },
+        });
+      },
+
       logout: () => {
+        // Call the logout API endpoint to clear the cookie
+        fetch(`${API_BASE_URL}/customer/auth/logout`, {
+          method: 'POST',
+          credentials: 'include',
+        }).catch(console.error);
+        
+        // Reset the local state
         set({
           token: null,
           isAuthenticated: false,
           user: null,
         });
+
+        // Redirect to home page after logout
         window.location.href = '/';
       },
     }),
     {
       name: 'customer-auth-storage',
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true // This helps with SSR and React 18 compatibility
     }
   )
 );

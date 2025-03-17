@@ -232,26 +232,29 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
       // Ensure directories exist
       const uploadsProductsDir = path.join(process.cwd(), 'uploads', 'products');
       const publicUploadsDir = path.join(process.cwd(), 'public', 'uploads', 'products');
+      const publicImagesDir = path.join(process.cwd(), 'public', 'images', 'products');
       
-      if (!fs.existsSync(uploadsProductsDir)) {
-        fs.mkdirSync(uploadsProductsDir, { recursive: true });
-        console.log(`Created upload directory: ${uploadsProductsDir}`);
-      }
-      
-      if (!fs.existsSync(publicUploadsDir)) {
-        fs.mkdirSync(publicUploadsDir, { recursive: true });
-        console.log(`Created public directory: ${publicUploadsDir}`);
-      }
+      [uploadsProductsDir, publicUploadsDir, publicImagesDir].forEach(dir => {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+          console.log(`Created directory: ${dir}`);
+        }
+      });
       
       const uploadPath = path.join(uploadsProductsDir, filename);
       
       await fs.promises.copyFile(imagePath, uploadPath);
       console.log(`Image saved to ${uploadPath}`);
       
-      // Also copy to public directory for frontend access
-      const publicPath = path.join(publicUploadsDir, filename);
-      await fs.promises.copyFile(imagePath, publicPath);
-      console.log(`Image copied to public directory: ${publicPath}`);
+      // Copy to public/uploads/products for backwards compatibility
+      const publicUploadsPath = path.join(publicUploadsDir, filename);
+      await fs.promises.copyFile(uploadPath, publicUploadsPath);
+      console.log(`Image copied to public uploads directory: ${publicUploadsPath}`);
+      
+      // Copy to public/images/products for correct path
+      const publicImagesPath = path.join(publicImagesDir, filename);
+      await fs.promises.copyFile(uploadPath, publicImagesPath);
+      console.log(`Image copied to public images directory: ${publicImagesPath}`);
       
       // Add the image URL to the result
       if (result) {
@@ -357,38 +360,48 @@ router.post('/products', upload.single('image'), async (req, res) => {
         console.error('No data field found in request body');
         return res.status(400).json({
           status: 'error',
-          message: 'Missing product data'
+          message: 'Missing product data',
+          details: JSON.stringify(req.body)
         });
       }
       
       // Parse the JSON data from the 'data' field
-      productData = JSON.parse(req.body.data);
-      console.log('Parsed product data:', productData);
+      try {
+        productData = JSON.parse(req.body.data);
+        console.log('Parsed product data:', productData);
+      } catch (parseError) {
+        console.error('Error parsing JSON:', parseError, 'Data received:', req.body.data);
+        return res.status(400).json({
+          status: 'error',
+          message: 'Invalid JSON in product data',
+          details: parseError instanceof Error ? parseError.message : 'Unknown parsing error'
+        });
+      }
     } catch (error) {
-      console.error('Error parsing product data:', error);
+      console.error('Error processing product data:', error);
       return res.status(400).json({
         status: 'error',
-        message: 'Invalid product data format'
+        message: 'Invalid product data format',
+        details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
-
+    
     // Check if there's an image file in the request
     if (req.file) {
       const filename = `${Date.now()}-${path.basename(req.file.originalname)}`;
       
-      // Ensure directories exist
+      // Ensure all directories exist
       const uploadDir = path.join(process.cwd(), 'uploads', 'products');
-      const publicDir = path.join(process.cwd(), 'public', 'uploads', 'products');
+      const publicUploadsDir = path.join(process.cwd(), 'public', 'uploads', 'products');
+      const publicImagesDir = path.join(process.cwd(), 'public', 'images', 'products');
       
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-        console.log(`Created upload directory: ${uploadDir}`);
-      }
-      
-      if (!fs.existsSync(publicDir)) {
-        fs.mkdirSync(publicDir, { recursive: true });
-        console.log(`Created public directory: ${publicDir}`);
-      }
+      // Create all required directories if they don't exist
+      [uploadDir, publicUploadsDir, publicImagesDir].forEach(dir => {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+          console.log(`Created directory: ${dir}`);
+        }
+      });
       
       // Save the image to the uploads directory
       const uploadPath = path.join(uploadDir, filename);
@@ -403,10 +416,15 @@ router.post('/products', upload.single('image'), async (req, res) => {
       }
       console.log(`Image saved to ${uploadPath}`);
       
-      // Also copy to public directory for frontend access
-      const publicPath = path.join(publicDir, filename);
-      await fs.promises.copyFile(uploadPath, publicPath);
-      console.log(`Image copied to public directory: ${publicPath}`);
+      // Copy to public/uploads/products for backwards compatibility
+      const publicUploadsPath = path.join(publicUploadsDir, filename);
+      await fs.promises.copyFile(uploadPath, publicUploadsPath);
+      console.log(`Image copied to public uploads directory: ${publicUploadsPath}`);
+      
+      // Copy to public/images/products for correct path
+      const publicImagesPath = path.join(publicImagesDir, filename);
+      await fs.promises.copyFile(uploadPath, publicImagesPath);
+      console.log(`Image copied to public images directory: ${publicImagesPath}`);
       
       // Set the image URL in the product data
       productData.imageUrl = `/images/products/${filename}`;
@@ -478,7 +496,9 @@ router.post('/products', upload.single('image'), async (req, res) => {
     
     res.status(201).json({
       status: 'success',
-      data: product
+      data: {
+        item: product
+      }
     });
   } catch (error) {
     console.error('Save product error:', error);
@@ -639,15 +659,20 @@ router.delete('/products/:id', async (req, res) => {
     const { id } = req.params;
     
     // Get product to delete its image
-    const product = await productService.getProductById(id);
-    if (product?.imageUrl) {
-      const imagePath = path.join(uploadDir, path.basename(product.imageUrl));
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-      }
-      const publicImagePath = path.join(publicImagesDir, path.basename(product.imageUrl));
-      if (fs.existsSync(publicImagePath)) {
-        fs.unlinkSync(publicImagePath);
+    const productResponse = await productService.getProductById(id);
+    const productData = productResponse?.data?.item || productResponse;
+    
+    if (productData && typeof productData === 'object' && 'imageUrl' in productData) {
+      const imageUrl = productData.imageUrl as string;
+      if (imageUrl) {
+        const imagePath = path.join(uploadDir, path.basename(imageUrl));
+        if (fs.existsSync(imagePath)) {
+          fs.unlinkSync(imagePath);
+        }
+        const publicImagePath = path.join(publicImagesDir, path.basename(imageUrl));
+        if (fs.existsSync(publicImagePath)) {
+          fs.unlinkSync(publicImagePath);
+        }
       }
     }
     
@@ -662,32 +687,6 @@ router.delete('/products/:id', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: error instanceof Error ? error.message : 'Failed to delete product'
-    });
-  }
-});
-
-// List products
-router.get('/products', async (req, res) => {
-  try {
-    const { category, search, page = 1, limit = 10 } = req.query;
-    const pageNum = Number(page);
-    const limitNum = Number(limit);
-
-    const result = await productService.listProducts({
-      page: pageNum,
-      limit: limitNum,
-      where: category ? { category: category.toString() } : undefined,
-      orderBy: { createdAt: 'desc' }
-    });
-
-    res.json({
-      status: 'success',
-      data: result
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to fetch products'
     });
   }
 });
@@ -715,6 +714,46 @@ router.get('/products/:id', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: error instanceof Error ? error.message : 'Failed to get product'
+    });
+  }
+});
+
+// Get all products for admin inventory
+router.get('/products', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const sort = req.query.sort as string || 'updatedAt';
+    const order = req.query.order as string || 'desc';
+    const search = req.query.search as string || '';
+    const category = req.query.category as string;
+    
+    // Use listProducts with the correct parameters
+    const result = await productService.listProducts({
+      page,
+      limit,
+      where: {
+        ...(search ? {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { description: { contains: search, mode: 'insensitive' } },
+            { tags: { has: search } }
+          ]
+        } : {}),
+        ...(category ? { category } : {}),
+      },
+      orderBy: { [sort]: order },
+    });
+    
+    res.json({
+      status: 'success',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    res.status(500).json({ 
+      status: 'error',
+      message: 'Failed to fetch products' 
     });
   }
 });

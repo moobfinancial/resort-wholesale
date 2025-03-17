@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { prisma } from '../../lib/prisma';
 import { requireAdmin } from '../middleware/auth';
 import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
+import { supplierService } from '../services/supplierService';
 import { Prisma } from '@prisma/client';
 
 const router = Router();
@@ -48,22 +48,23 @@ const upload = multer({
 });
 
 // Get all suppliers
-router.get('/', requireAdmin, async (_req, res) => {
+router.get('/', requireAdmin, async (req, res) => {
   try {
-    const suppliers = await prisma.supplier.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    
+    const result = await supplierService.getAllSuppliers({ page, limit });
+    
     res.json({
       status: 'success',
-      data: {
-        suppliers
-      }
+      data: result
     });
   } catch (error) {
     console.error('Error fetching suppliers:', error);
     res.status(500).json({ 
       status: 'error',
-      message: 'Failed to fetch suppliers' 
+      message: 'Failed to fetch suppliers',
+      details: error instanceof Error ? error.message : undefined
     });
   }
 });
@@ -78,45 +79,49 @@ router.post('/', requireAdmin, upload.fields([
     const body = req.body;
 
     // Process uploaded files
-    let logoPath: string | null = null;
-    let documentPaths: string[] = [];
+    let logoUrl: string | null = null;
+    let notes = body.notes || null;
 
     if (files.logo) {
-      logoPath = `/uploads/suppliers/${files.logo[0].filename}`;
+      logoUrl = `/uploads/suppliers/${files.logo[0].filename}`;
+      // Store logo URL in notes field since SupplierData doesn't have a logo field
+      notes = notes ? `${notes}\nLogo URL: ${logoUrl}` : `Logo URL: ${logoUrl}`;
     }
 
     if (files.documents) {
-      documentPaths = files.documents.map(file => 
+      // Store document URLs in notes field since SupplierData doesn't have a documents field
+      const docUrls = files.documents.map(file => 
         `/uploads/suppliers/${file.filename}`
       );
+      const docNote = `Document URLs: ${docUrls.join(', ')}`;
+      notes = notes ? `${notes}\n${docNote}` : docNote;
     }
 
-    const supplier = await prisma.supplier.create({
-      data: {
-        id: uuidv4(), // Generate a unique ID
-        name: body.name,
-        contactPerson: body.contactPerson,
-        email: body.email,
-        phone: body.phone,
-        address: typeof body.address === 'string' 
-          ? body.address 
-          : (body.address as Prisma.JsonValue),
-        website: body.website || null,
-        logo: logoPath,
-        status: body.status || 'ACTIVE',
-        category: body.category,
-        paymentTerms: body.paymentTerms,
-        documents: documentPaths,
-        updatedAt: new Date(), // Set the updatedAt field
-      },
-    });
+    // Map the request body to match SupplierData interface
+    const supplierData = {
+      name: body.name,
+      contactName: body.contactPerson || body.contactName, // Support both field names
+      email: body.email,
+      phone: body.phone,
+      address: typeof body.address === 'string' 
+        ? JSON.parse(body.address) 
+        : (body.address as Prisma.JsonValue),
+      website: body.website || null,
+      notes: notes,
+      isActive: body.status === 'ACTIVE' || body.isActive === true || body.isActive === 'true',
+    };
+
+    const supplier = await supplierService.createSupplier(supplierData);
+    
     res.status(201).json({
       status: 'success',
-      data: supplier
+      data: {
+        item: supplier
+      }
     });
   } catch (error: any) {
     console.error('Error creating supplier:', error);
-    res.status(500).json({ 
+    res.status(503).json({ 
       status: 'error',
       message: 'Failed to create supplier',
       details: error.message 
@@ -128,21 +133,27 @@ router.post('/', requireAdmin, upload.fields([
 router.get('/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const supplier = await prisma.supplier.findUnique({
-      where: { id },
-    });
+    const supplier = await supplierService.getSupplierById(id);
+    
     if (!supplier) {
-      return res.status(404).json({ error: 'Supplier not found' });
+      return res.status(404).json({ 
+        status: 'error', 
+        message: 'Supplier not found' 
+      });
     }
+    
     res.json({
       status: 'success',
-      data: supplier
+      data: {
+        item: supplier
+      }
     });
   } catch (error) {
     console.error('Error fetching supplier:', error);
     res.status(500).json({ 
       status: 'error',
-      message: 'Failed to fetch supplier' 
+      message: 'Failed to fetch supplier',
+      details: error instanceof Error ? error.message : undefined
     });
   }
 });
@@ -156,72 +167,70 @@ router.put('/:id', requireAdmin, upload.fields([
     const { id } = req.params;
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
     const body = req.body;
-
-    // Get existing supplier to handle file updates
-    const existingSupplier = await prisma.supplier.findUnique({
-      where: { id },
-    });
-
+    
+    // Check if supplier exists
+    const existingSupplier = await supplierService.getSupplierById(id);
+    
     if (!existingSupplier) {
-      return res.status(404).json({ error: 'Supplier not found' });
-    }
-
-    // Process uploaded files
-    let logoPath = existingSupplier.logo;
-    let documentPaths = existingSupplier.documents;
-
-    // Update logo if new one is uploaded
-    if (files.logo) {
-      // Delete old logo if it exists
-      if (existingSupplier.logo) {
-        const oldLogoPath = path.join(process.cwd(), existingSupplier.logo);
-        if (fs.existsSync(oldLogoPath)) {
-          fs.unlinkSync(oldLogoPath);
-        }
-      }
-      logoPath = `/uploads/suppliers/${files.logo[0].filename}`;
-    }
-
-    // Update documents if new ones are uploaded
-    if (files.documents) {
-      // Delete old documents
-      existingSupplier.documents.forEach((doc: string) => {
-        const oldDocPath = path.join(process.cwd(), doc);
-        if (fs.existsSync(oldDocPath)) {
-          fs.unlinkSync(oldDocPath);
-        }
+      return res.status(404).json({ 
+        status: 'error', 
+        message: 'Supplier not found' 
       });
-      documentPaths = files.documents.map(file => 
+    }
+    
+    // Process uploaded files
+    let notes = existingSupplier.notes || '';
+    
+    if (files.logo) {
+      const logoUrl = `/uploads/suppliers/${files.logo[0].filename}`;
+      // Update logo URL in notes
+      if (notes.includes('Logo URL:')) {
+        notes = notes.replace(/Logo URL: [^\n]+/, `Logo URL: ${logoUrl}`);
+      } else {
+        notes = notes ? `${notes}\nLogo URL: ${logoUrl}` : `Logo URL: ${logoUrl}`;
+      }
+    }
+    
+    if (files.documents) {
+      // Add new document URLs to notes
+      const docUrls = files.documents.map(file => 
         `/uploads/suppliers/${file.filename}`
       );
+      const docNote = `Document URLs: ${docUrls.join(', ')}`;
+      if (notes.includes('Document URLs:')) {
+        notes = notes.replace(/Document URLs: [^\n]+/, docNote);
+      } else {
+        notes = notes ? `${notes}\n${docNote}` : docNote;
+      }
     }
-
-    const supplier = await prisma.supplier.update({
-      where: { id },
-      data: {
-        name: body.name,
-        contactPerson: body.contactPerson,
-        email: body.email,
-        phone: body.phone,
-        address: typeof body.address === 'string' 
-          ? body.address 
-          : (body.address as Prisma.JsonValue),
-        website: body.website || null,
-        logo: logoPath,
-        status: body.status,
-        category: body.category,
-        paymentTerms: body.paymentTerms,
-        documents: documentPaths,
-        updatedAt: new Date(), // Set the updatedAt field
-      },
-    });
+    
+    // Update supplier
+    const updatedData = {
+      name: body.name || existingSupplier.name,
+      contactName: body.contactPerson || body.contactName || existingSupplier.contactName,
+      email: body.email || existingSupplier.email,
+      phone: body.phone || existingSupplier.phone,
+      address: body.address 
+        ? (typeof body.address === 'string' 
+            ? JSON.parse(body.address) 
+            : (body.address as Prisma.JsonValue))
+        : existingSupplier.address,
+      website: body.website !== undefined ? body.website : existingSupplier.website,
+      notes: notes,
+      isActive: body.status === 'ACTIVE' || body.isActive === true || body.isActive === 'true' || existingSupplier.isActive,
+    };
+    
+    const updatedSupplier = await supplierService.updateSupplier(id, updatedData);
+    
     res.json({
       status: 'success',
-      data: supplier
+      data: {
+        item: updatedSupplier
+      }
     });
   } catch (error: any) {
     console.error('Error updating supplier:', error);
-    res.status(500).json({ 
+    res.status(503).json({ 
       status: 'error',
       message: 'Failed to update supplier',
       details: error.message 
@@ -233,43 +242,32 @@ router.put('/:id', requireAdmin, upload.fields([
 router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Get supplier to delete files
-    const supplier = await prisma.supplier.findUnique({
-      where: { id },
-    });
-
-    if (!supplier) {
-      return res.status(404).json({ error: 'Supplier not found' });
+    
+    // Check if supplier exists
+    const existingSupplier = await supplierService.getSupplierById(id);
+    
+    if (!existingSupplier) {
+      return res.status(404).json({ 
+        status: 'error', 
+        message: 'Supplier not found' 
+      });
     }
-
-    // Delete logo and documents
-    if (supplier.logo) {
-      const logoPath = path.join(process.cwd(), supplier.logo);
-      if (fs.existsSync(logoPath)) {
-        fs.unlinkSync(logoPath);
-      }
-    }
-
-    supplier.documents.forEach((doc: string) => {
-      const docPath = path.join(process.cwd(), doc);
-      if (fs.existsSync(docPath)) {
-        fs.unlinkSync(docPath);
-      }
-    });
-
-    await prisma.supplier.delete({
-      where: { id },
-    });
-    res.status(204).json({
+    
+    // Delete supplier
+    await supplierService.deleteSupplier(id);
+    
+    res.json({
       status: 'success',
-      message: 'Supplier deleted successfully'
+      data: {
+        message: 'Supplier deleted successfully'
+      }
     });
   } catch (error) {
     console.error('Error deleting supplier:', error);
     res.status(500).json({ 
       status: 'error',
-      message: 'Failed to delete supplier' 
+      message: 'Failed to delete supplier',
+      details: error instanceof Error ? error.message : undefined
     });
   }
 });
