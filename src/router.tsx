@@ -104,7 +104,15 @@ export const router = createBrowserRouter([
         element: <Checkout />,
       },
       {
-        path: 'order/confirmation/:orderNumber',
+        path: 'order-confirmation',
+        element: <OrderConfirmation />,
+      },
+      {
+        path: 'order-confirmation/:orderNumber',
+        element: <OrderConfirmation />,
+      },
+      {
+        path: 'stripe-checkout-confirmation/:session_id',
         element: <OrderConfirmation />,
       },
     ],

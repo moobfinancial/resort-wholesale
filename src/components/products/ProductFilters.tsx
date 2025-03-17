@@ -1,4 +1,3 @@
-import React from 'react';
 import { Category } from '../../types/product';
 
 interface ProductFiltersProps {
@@ -34,7 +33,7 @@ export default function ProductFilters({
           </button>
           {categories && categories.map((category) => (
             <button
-              key={category.id || `category-${category.name}`}
+              key={category.id ? `category-${category.id}` : `category-${category.name}-${Math.random().toString(36).substr(2, 9)}`}
               onClick={() => {
                 setSelectedCategory(category.id === selectedCategory ? '' : category.id);
               }}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Form, Input, Button, Card, Space, Typography, Select } from 'antd';
+import { Form, Input, Button, Card, Typography, Select } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 
 const { Title } = Typography;
@@ -15,6 +15,15 @@ interface UserSettingsProps {
     notificationPreferences: string[];
     language: string;
     timezone: string;
+    businessType?: string;
+    taxId?: string;
+    address?: {
+      street: string;
+      city: string;
+      state: string;
+      zipCode: string;
+      country: string;
+    };
   };
   onUpdate: (values: any) => Promise<void>;
 }
@@ -72,6 +81,58 @@ const UserSettings: React.FC<UserSettingsProps> = ({ customer, onUpdate }) => {
           rules={[{ required: true, message: 'Please enter phone number' }]}
         >
           <Input />
+        </Form.Item>
+
+        <Form.Item
+          label="Business Type"
+          name="businessType"
+          rules={[{ required: true, message: 'Please enter business type' }]}
+        >
+          <Input placeholder="e.g., Gift Shop, Resort Store" />
+        </Form.Item>
+
+        <Form.Item
+          label="Tax ID"
+          name="taxId"
+          rules={[{ required: true, message: 'Please enter tax ID' }]}
+        >
+          <Input placeholder="Enter tax ID number" />
+        </Form.Item>
+
+        <Form.Item
+          label="Business Address"
+          name={['address', 'street']}
+          rules={[{ required: true, message: 'Please enter address' }]}
+        >
+          <Input placeholder="Street address" />
+        </Form.Item>
+
+        <Form.Item
+          name={['address', 'city']}
+          rules={[{ required: true, message: 'Please enter city' }]}
+        >
+          <Input placeholder="City" />
+        </Form.Item>
+
+        <Form.Item
+          name={['address', 'state']}
+          rules={[{ required: true, message: 'Please enter state/province' }]}
+        >
+          <Input placeholder="State/Province" />
+        </Form.Item>
+
+        <Form.Item
+          name={['address', 'zipCode']}
+          rules={[{ required: true, message: 'Please enter ZIP/postal code' }]}
+        >
+          <Input placeholder="ZIP/Postal Code" />
+        </Form.Item>
+
+        <Form.Item
+          name={['address', 'country']}
+          rules={[{ required: true, message: 'Please enter country' }]}
+        >
+          <Input placeholder="Country" />
         </Form.Item>
 
         <Form.Item

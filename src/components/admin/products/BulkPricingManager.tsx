@@ -2,7 +2,7 @@ import { useState, useEffect, useTransition } from 'react';
 import { Button, Table, Modal, Form, InputNumber, message, Typography, Card } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
-import api from '../../../utils/api';
+import { api } from '../../../lib/api';
 
 const { Title } = Typography;
 
@@ -45,6 +45,22 @@ export default function BulkPricingManager({
   const normalizeTiersData = (data: any): BulkPricing[] => {
     if (!data) return [];
     
+    // Check for the consistent API response format first
+    if (data.status === 'success' && data.data) {
+      // Handle the data field
+      if (Array.isArray(data.data)) {
+        return data.data;
+      } else if (data.data.tiers && Array.isArray(data.data.tiers)) {
+        return data.data.tiers;
+      } else if (typeof data.data === 'object' && 'minQuantity' in data.data && 'price' in data.data) {
+        return [data.data];
+      } else {
+        console.warn('Unexpected data structure in success response:', data);
+        return [];
+      }
+    }
+    
+    // Legacy format handling
     // If it's already an array, return it
     if (Array.isArray(data)) return data;
     
@@ -71,7 +87,7 @@ export default function BulkPricingManager({
   const fetchPricingTiers = async () => {
     setLoading(true);
     try {
-      const response: BulkPricingResponse = await api.get(`products/${productId}/bulk-pricing`);
+      const response = await api.get(`products/${productId}/bulk-pricing`);
       startTransition(() => {
         // Use the helper function to normalize the data
         const tiersData = normalizeTiersData(response.data);
@@ -98,7 +114,21 @@ export default function BulkPricingManager({
       title: 'Price per Unit',
       dataIndex: 'price',
       key: 'price',
-      render: (price: number) => `$${price.toFixed(2)}`,
+      render: (price: any) => {
+        // Handle different types - check if price is a string, number, or Decimal object
+        if (price === null || price === undefined) {
+          return '$0.00';
+        }
+        
+        // Handle Prisma Decimal object
+        if (typeof price === 'object' && price !== null) {
+          return `$${parseFloat(price.toString()).toFixed(2)}`;
+        }
+        
+        // Handle string or number
+        const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+        return `$${numPrice.toFixed(2)}`;
+      },
     },
     {
       title: 'Actions',
@@ -137,12 +167,18 @@ export default function BulkPricingManager({
   const handleDelete = async (tierId: string) => {
     try {
       setLoading(true);
-      await api.delete(`products/${productId}/bulk-pricing/tier/${tierId}`);
+      const response = await api.delete(`products/${productId}/bulk-pricing/tier/${tierId}`);
       
-      const newTiers = tiers.filter(tier => tier.id !== tierId);
-      setTiers(newTiers);
-      onUpdate(newTiers);
-      message.success('Pricing tier deleted successfully');
+      // Check if response follows success format
+      if (response && response.data && response.data.status === 'success') {
+        const newTiers = tiers.filter(tier => tier.id !== tierId);
+        setTiers(newTiers);
+        await onUpdate(newTiers);
+        message.success('Pricing tier deleted successfully');
+      } else {
+        console.error('Unexpected response format:', response);
+        message.error('Unexpected response format from server');
+      }
     } catch (error) {
       console.error('Failed to delete pricing tier:', error);
       message.error('Failed to delete pricing tier');
@@ -157,13 +193,13 @@ export default function BulkPricingManager({
       
       if (editingTier) {
         // Update existing tier
-        const updatedTier: BulkPricingResponse = await api.put(`products/${productId}/bulk-pricing/tier/${editingTier.id}`, {
+        const response = await api.put(`products/${productId}/bulk-pricing/tier/${editingTier.id}`, {
           ...values,
           id: editingTier.id
         });
         
         // Use helper to normalize the response data
-        const normalizedData = normalizeTiersData(updatedTier.data);
+        const normalizedData = normalizeTiersData(response.data);
         const updatedTierData = normalizedData.length > 0 ? normalizedData[0] : {
           ...values,
           id: editingTier.id,
@@ -175,16 +211,16 @@ export default function BulkPricingManager({
         );
         
         setTiers(updatedTiers);
-        onUpdate(updatedTiers);
+        await onUpdate(updatedTiers);
       } else {
         // Add new tier
-        const newTier: BulkPricingResponse = await api.post(`products/${productId}/bulk-pricing/tier`, {
+        const response = await api.post(`products/${productId}/bulk-pricing/tier`, {
           ...values,
           productId
         });
         
         // Use helper to normalize the response data
-        const normalizedData = normalizeTiersData(newTier.data);
+        const normalizedData = normalizeTiersData(response.data);
         const newTierData = normalizedData.length > 0 ? normalizedData[0] : {
           ...values,
           id: Date.now().toString(), // Fallback ID
@@ -193,7 +229,7 @@ export default function BulkPricingManager({
         
         const newTiers = [...tiers, newTierData];
         setTiers(newTiers);
-        onUpdate(newTiers);
+        await onUpdate(newTiers);
       }
       
       setIsModalVisible(false);

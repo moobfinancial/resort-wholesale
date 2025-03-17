@@ -10,7 +10,9 @@
     "build": "tsc && vite build",
     "build:server": "tsc -p tsconfig.server.json",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit",
+    "type-check:watch": "tsc --noEmit --watch"
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",
@@ -26,6 +28,7 @@
     "@types/next": "^8.0.7",
     "@types/nodemailer": "^6.4.17",
     "@types/stripe": "^8.0.416",
+    "@types/styled-components": "^5.1.34",
     "antd": "^5.24.2",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",
@@ -38,7 +41,9 @@
     "lucide-react": "^0.344.0",
     "multer": "^1.4.5-lts.1",
     "next-connect": "^1.0.0",
+    "node-fetch": "^3.3.2",
     "nodemailer": "^6.10.0",
+    "pg": "^8.14.0",
     "prisma": "^6.4.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -46,6 +51,7 @@
     "react-router-dom": "^6.29.0",
     "slugify": "^1.6.6",
     "stripe": "^17.7.0",
+    "styled-components": "^6.1.15",
     "uuid": "^9.0.1",
     "zod": "^3.24.2",
     "zustand": "^4.5.2"

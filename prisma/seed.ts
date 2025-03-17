@@ -1,5 +1,14 @@
-import { PrismaClient, Prisma, ProductStatus } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import { PrismaClient, Prisma } from '@prisma/client';
+import { hash } from 'bcrypt';
+
+// Define ProductStatus enum locally since it's not in the Prisma schema
+enum ProductStatus {
+  DRAFT = 'DRAFT',
+  PENDING_REVIEW = 'PENDING_REVIEW',
+  APPROVED = 'APPROVED',
+  PUBLISHED = 'PUBLISHED',
+  ARCHIVED = 'ARCHIVED'
+}
 
 const prisma = new PrismaClient();
 
@@ -16,7 +25,7 @@ const sampleProducts = [
     minOrder: 5,
     isActive: true,
     isFeatured: true,
-    status: ProductStatus.ACTIVE
+    status: ProductStatus.PUBLISHED
   },
   {
     name: 'Floral Sandals',
@@ -30,7 +39,7 @@ const sampleProducts = [
     minOrder: 3,
     isActive: true,
     isFeatured: true,
-    status: ProductStatus.ACTIVE
+    status: ProductStatus.PUBLISHED
   },
   {
     name: 'Jamaican Art Print',
@@ -44,7 +53,7 @@ const sampleProducts = [
     minOrder: 10,
     isActive: true,
     isFeatured: false,
-    status: ProductStatus.ACTIVE
+    status: ProductStatus.PUBLISHED
   },
   {
     name: 'Handwoven Basket',
@@ -58,7 +67,7 @@ const sampleProducts = [
     minOrder: 2,
     isActive: true,
     isFeatured: false,
-    status: ProductStatus.ACTIVE
+    status: ProductStatus.PUBLISHED
   },
   {
     name: 'Shell Necklace',
@@ -72,7 +81,7 @@ const sampleProducts = [
     minOrder: 5,
     isActive: true,
     isFeatured: false,
-    status: ProductStatus.ACTIVE
+    status: ProductStatus.PUBLISHED
   },
   {
     name: 'Island Souvenir',
@@ -86,7 +95,7 @@ const sampleProducts = [
     minOrder: 10,
     isActive: true,
     isFeatured: false,
-    status: ProductStatus.ACTIVE
+    status: ProductStatus.PUBLISHED
   }
 ];
 
@@ -98,15 +107,17 @@ async function main() {
   });
 
   if (!existingAdmin) {
-    const passwordHash = await bcrypt.hash('admin123', 10);
+    const passwordHash = await hash('admin123', 10);
     await prisma.admin.create({
       data: {
         email: adminEmail,
-        passwordHash,
         name: 'Admin User',
-      },
+        passwordHash: passwordHash
+      }
     });
-    console.log('Created admin user');
+    console.log('Admin user created:', adminEmail);
+  } else {
+    console.log('Admin user already exists:', adminEmail);
   }
 
   // Add sample products
@@ -128,7 +139,16 @@ async function main() {
       });
       console.log(`Created product: ${createdProduct.name}`);
     } else {
-      console.log(`Product with SKU ${product.sku} already exists`);
+      // Update existing product
+      const updatedProduct = await prisma.product.update({
+        where: { sku: product.sku },
+        data: {
+          ...product,
+          price: new Prisma.Decimal(product.price),
+          updatedAt: new Date(),
+        },
+      });
+      console.log(`Updated product: ${updatedProduct.name}`);
     }
   }
   

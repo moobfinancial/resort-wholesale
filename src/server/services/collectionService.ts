@@ -2,154 +2,508 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import crypto from 'crypto';
 
-type CreateCollectionInput = {
-  name: string;
-  description: string;
-  imageUrl?: string;
-  isActive?: boolean;
+type CollectionResponse<T> = {
+  status: 'success' | 'error';
+  data?: T;
+  message?: string;
+  details?: string;
 };
 
+interface CreateCollectionInput {
+  name: string;
+  description?: string;
+  imageUrl?: string | null;
+  isActive?: boolean;
+}
+
 export const collectionService = {
-  async createCollection(data: CreateCollectionInput) {
-    const collectionData: Prisma.CollectionCreateInput = {
-      ...data,
-      id: crypto.randomUUID(), // Generate a unique ID
-      isActive: data.isActive ?? true,
-      updatedAt: new Date(), // Add the updatedAt field with current date
-    };
-
-    return prisma.collection.create({
-      data: collectionData,
-    });
-  },
-
-  async getCollection(id: string) {
-    return prisma.collection.findUnique({
-      where: { id },
-      include: {
-        Product: true,
-      },
-    });
-  },
-
-  async updateCollection(id: string, data: Partial<CreateCollectionInput>) {
-    return prisma.collection.update({
-      where: { id },
-      data: {
-        ...data,
-        updatedAt: new Date(),
-      },
-    });
-  },
-
-  async listCollections(params?: {
-    where?: Prisma.CollectionWhereInput;
-    orderBy?: Prisma.CollectionOrderByWithRelationInput;
-    page?: number;
-    limit?: number;
-  }) {
-    const { where, orderBy, page = 1, limit = 10 } = params || {};
-    
-    const skip = (page - 1) * limit;
-    
-    const [collections, total] = await Promise.all([
-      prisma.collection.findMany({
-        where,
-        orderBy: orderBy || { createdAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      prisma.collection.count({ where }),
-    ]);
-
-    // Manually calculate product counts since the relation may not be available in the schema
-    const formattedCollections = collections.map(collection => ({
-      ...collection,
-      productCount: collection.Product ? collection.Product.length : 0,
-    }));
-
-    return {
-      collections: formattedCollections,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
-  },
-
-  async getActiveCollections() {
+  // Test database connection
+  async testConnection() {
     try {
+      await prisma.$queryRaw`SELECT 1`;
+      return true;
+    } catch (error) {
+      console.error('Database connection test failed:', error);
+      return false;
+    }
+  },
+
+  // List collections with pagination
+  async listCollections({ 
+    page = 1, 
+    limit = 10,
+    orderBy = { createdAt: 'desc' } as Prisma.CollectionOrderByWithRelationInput
+  }): Promise<CollectionResponse<{
+    items: any[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }>> {
+    try {
+      // Check database connection first
+      const dbConnected = await this.testConnection();
+      
+      if (!dbConnected) {
+        return {
+          status: 'error',
+          message: 'Database unavailable',
+          data: {
+            items: [],
+            total: 0,
+            page,
+            limit,
+            totalPages: 0
+          }
+        };
+      }
+
+      const skip = (page - 1) * limit;
+      
+      const [collections, total] = await Promise.all([
+        prisma.collection.findMany({
+          skip,
+          take: limit,
+          orderBy,
+          include: {
+            _count: {
+              select: { Products: true }
+            }
+          }
+        }),
+        prisma.collection.count()
+      ]);
+
+      // Format collections with product count
+      const formattedCollections = collections.map(collection => ({
+        ...collection,
+        productCount: collection._count.Products,
+        _count: undefined
+      }));
+
+      return {
+        status: 'success',
+        data: {
+          items: formattedCollections,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      console.error('Error listing collections:', error);
+      return {
+        status: 'error',
+        message: 'Failed to list collections',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        data: {
+          items: [],
+          total: 0,
+          page,
+          limit,
+          totalPages: 0
+        }
+      };
+    }
+  },
+
+  // Get active collections
+  async getActiveCollections(): Promise<CollectionResponse<{
+    items: any[];
+  }>> {
+    try {
+      // Check database connection first
+      const dbConnected = await this.testConnection();
+      
+      if (!dbConnected) {
+        return {
+          status: 'error',
+          message: 'Database unavailable',
+          data: {
+            items: []
+          }
+        };
+      }
+
       const collections = await prisma.collection.findMany({
         where: {
-          isActive: true,
-        },
-        orderBy: {
-          createdAt: 'desc',
+          isActive: true
         },
         include: {
           _count: {
-            select: {
-              Product: true
-            }
+            select: { Products: true }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+
+      // Format collections with product count
+      const formattedCollections = collections.map(collection => ({
+        ...collection,
+        productCount: collection._count.Products,
+        _count: undefined
+      }));
+
+      return {
+        status: 'success',
+        data: {
+          items: formattedCollections
+        }
+      };
+    } catch (error) {
+      console.error('Error getting active collections:', error);
+      return {
+        status: 'error',
+        message: 'Failed to get active collections',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        data: {
+          items: []
+        }
+      };
+    }
+  },
+
+  // Get a single collection
+  async getCollection(id: string): Promise<CollectionResponse<{
+    item: any | null;
+  }>> {
+    try {
+      // Check database connection first
+      const dbConnected = await this.testConnection();
+      
+      if (!dbConnected) {
+        return {
+          status: 'error',
+          message: 'Database unavailable',
+          data: {
+            item: null
+          }
+        };
+      }
+
+      const collection = await prisma.collection.findUnique({
+        where: { id },
+        include: {
+          _count: {
+            select: { Products: true }
           }
         }
       });
 
-      // Format collections to include product count
-      return collections.map(collection => ({
+      if (!collection) {
+        return {
+          status: 'error',
+          message: 'Collection not found',
+          data: {
+            item: null
+          }
+        };
+      }
+
+      // Format collection with product count
+      const formattedCollection = {
         ...collection,
-        productCount: collection._count.Product
-      }));
+        productCount: collection._count.Products,
+        _count: undefined
+      };
+
+      return {
+        status: 'success',
+        data: {
+          item: formattedCollection
+        }
+      };
     } catch (error) {
-      console.error('Error fetching active collections:', error);
-      // Return empty array instead of throwing
-      return [];
+      console.error('Error getting collection:', error);
+      return {
+        status: 'error',
+        message: 'Failed to get collection',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        data: {
+          item: null
+        }
+      };
     }
   },
 
-  async getCollectionProducts(id: string) {
-    const collection = await prisma.collection.findUnique({
-      where: { id },
-      include: {
-        Product: {
-          include: {
-            BulkPricing: true,
-            Supplier: true,
-          },
+  // Create a new collection
+  async createCollection({ name, description, imageUrl, isActive }: CreateCollectionInput): Promise<CollectionResponse<{
+    item: any;
+  }>> {
+    try {
+      // Check database connection first
+      const dbConnected = await this.testConnection();
+      
+      if (!dbConnected) {
+        return {
+          status: 'error',
+          message: 'Database unavailable'
+        };
+      }
+
+      const collection = await prisma.collection.create({
+        data: {
+          name,
+          description,
+          imageUrl,
+          isActive: isActive ?? true,
+          id: crypto.randomUUID()
         },
-      },
-    });
+        include: {
+          _count: {
+            select: { Products: true }
+          }
+        }
+      });
 
-    return collection?.Product || [];
+      // Format collection with product count
+      const formattedCollection = {
+        ...collection,
+        productCount: collection._count.Products,
+        _count: undefined
+      };
+
+      return {
+        status: 'success',
+        data: {
+          item: formattedCollection
+        }
+      };
+    } catch (error) {
+      console.error('Error creating collection:', error);
+      return {
+        status: 'error',
+        message: 'Failed to create collection',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   },
 
-  async addProductsToCollection(collectionId: string, productIds: string[]) {
-    return prisma.collection.update({
-      where: { id: collectionId },
-      data: {
-        Product: {
-          connect: productIds.map(id => ({ id })),
+  // Update a collection
+  async updateCollection(id: string, data: {
+    name?: string;
+    description?: string;
+    imageUrl?: string | null;
+    isActive?: boolean;
+  }): Promise<CollectionResponse<{
+    item: any;
+  }>> {
+    try {
+      // Check database connection first
+      const dbConnected = await this.testConnection();
+      
+      if (!dbConnected) {
+        return {
+          status: 'error',
+          message: 'Database unavailable'
+        };
+      }
+
+      const collection = await prisma.collection.update({
+        where: { id },
+        data,
+        include: {
+          _count: {
+            select: { Products: true }
+          }
+        }
+      });
+
+      // Format collection with product count
+      const formattedCollection = {
+        ...collection,
+        productCount: collection._count.Products,
+        _count: undefined
+      };
+
+      return {
+        status: 'success',
+        data: {
+          item: formattedCollection
+        }
+      };
+    } catch (error) {
+      console.error('Error updating collection:', error);
+      return {
+        status: 'error',
+        message: 'Failed to update collection',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  },
+
+  // Delete a collection
+  async deleteCollection(id: string): Promise<CollectionResponse<null>> {
+    try {
+      // Check database connection first
+      const dbConnected = await this.testConnection();
+      
+      if (!dbConnected) {
+        return {
+          status: 'error',
+          message: 'Database unavailable'
+        };
+      }
+
+      await prisma.collection.delete({
+        where: { id }
+      });
+
+      return {
+        status: 'success',
+        data: null
+      };
+    } catch (error) {
+      console.error('Error deleting collection:', error);
+      return {
+        status: 'error',
+        message: 'Failed to delete collection',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  },
+
+  // Get products in a collection
+  async getCollectionProducts(collectionId: string): Promise<CollectionResponse<{
+    items: any[];
+  }>> {
+    try {
+      // Check database connection first
+      const dbConnected = await this.testConnection();
+      
+      if (!dbConnected) {
+        return {
+          status: 'error',
+          message: 'Database unavailable',
+          data: {
+            items: []
+          }
+        };
+      }
+
+      const products = await prisma.product.findMany({
+        where: {
+          collectionId
         },
-        updatedAt: new Date(),
-      },
-    });
+        include: {
+          BulkPricing: true,
+          Variants: true
+        }
+      });
+
+      return {
+        status: 'success',
+        data: {
+          items: products
+        }
+      };
+    } catch (error) {
+      console.error('Error getting collection products:', error);
+      return {
+        status: 'error',
+        message: 'Failed to get collection products',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        data: {
+          items: []
+        }
+      };
+    }
   },
 
-  async removeProductFromCollection(collectionId: string, productId: string) {
-    return prisma.collection.update({
-      where: { id: collectionId },
-      data: {
-        Product: {
-          disconnect: { id: productId },
-        },
-        updatedAt: new Date(),
-      },
-    });
+  // Add products to a collection
+  async addProductsToCollection(collectionId: string, productIds: string[]): Promise<CollectionResponse<null>> {
+    try {
+      // Check database connection first
+      const dbConnected = await this.testConnection();
+      
+      if (!dbConnected) {
+        return {
+          status: 'error',
+          message: 'Database unavailable'
+        };
+      }
+
+      // Verify the collection exists
+      const collection = await prisma.collection.findUnique({
+        where: { id: collectionId }
+      });
+      
+      if (!collection) {
+        return {
+          status: 'error',
+          message: 'Collection not found'
+        };
+      }
+      
+      // Update each product's collectionId field
+      const updatePromises = productIds.map(productId => 
+        prisma.product.update({
+          where: { id: productId },
+          data: { collectionId }
+        })
+      );
+      
+      await Promise.all(updatePromises);
+
+      return {
+        status: 'success',
+        data: null
+      };
+    } catch (error) {
+      console.error('Error adding products to collection:', error);
+      return {
+        status: 'error',
+        message: 'Failed to add products to collection',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   },
 
-  async deleteCollection(id: string) {
-    return prisma.collection.delete({
-      where: { id },
-    });
-  },
+  // Remove product from a collection
+  async removeProductFromCollection(collectionId: string, productId: string): Promise<CollectionResponse<null>> {
+    try {
+      // Check database connection first
+      const dbConnected = await this.testConnection();
+      
+      if (!dbConnected) {
+        return {
+          status: 'error',
+          message: 'Database unavailable'
+        };
+      }
+
+      // Verify the collection exists
+      const collection = await prisma.collection.findUnique({
+        where: { id: collectionId }
+      });
+      
+      if (!collection) {
+        return {
+          status: 'error',
+          message: 'Collection not found'
+        };
+      }
+      
+      // Set product's collectionId to null
+      await prisma.product.update({
+        where: { id: productId },
+        data: { collectionId: null }
+      });
+
+      return {
+        status: 'success',
+        data: null
+      };
+    } catch (error) {
+      console.error('Error removing product from collection:', error);
+      return {
+        status: 'error',
+        message: 'Failed to remove product from collection',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
 };

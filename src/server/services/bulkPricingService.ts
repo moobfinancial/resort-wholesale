@@ -44,6 +44,7 @@ export const bulkPricingService = {
               productId,
               minQuantity: tier.minQuantity,
               price: tier.price,
+              updatedAt: new Date(), // Add updatedAt field
             })),
           });
         }

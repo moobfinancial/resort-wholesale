@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock } from 'lucide-react';
 import { useCustomerAuthStore } from '../../stores/customerAuth';
+import { useLocation } from 'react-router-dom';
 
 interface SignInProps {
   onClose: () => void;
@@ -9,25 +9,27 @@ interface SignInProps {
 }
 
 export default function SignIn({ onClose, onSignIn }: SignInProps) {
-  const navigate = useNavigate();
-  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const login = useCustomerAuthStore(state => state.login);
+
+  // Get current location to determine where to redirect after login
+  const location = useLocation();
+  const currentPath = location.pathname;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
     try {
+      // Don't pass the redirect path - we'll handle that in the AuthModal
       await login(email, password);
+      console.log('Login successful');
       onSignIn(); // Call the onSignIn callback to update the app state
-      
-      // Get the redirect path from location state or default to dashboard
-      const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/customer/dashboard';
-      navigate(from, { replace: true });
+      // No need to call onClose() here as the AuthModal will handle it
     } catch (err) {
+      console.error('Login error:', err);
       setError(err instanceof Error ? err.message : 'Failed to sign in');
     }
   };
@@ -99,7 +101,7 @@ export default function SignIn({ onClose, onSignIn }: SignInProps) {
 
         <div className="text-sm">
           <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
-            Forgot password?
+            Forgot your password?
           </a>
         </div>
       </div>

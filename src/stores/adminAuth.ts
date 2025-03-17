@@ -8,6 +8,7 @@ interface AdminState {
     email: string;
     name: string;
   } | null;
+  token: string | null;
   isHydrated: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -20,28 +21,42 @@ export const useAdminAuthStore = create<AdminState>()(
     (set) => ({
       isAuthenticated: false,
       admin: null,
+      token: null,
       isHydrated: false,
 
       setHydrated: (state: boolean) => set({ isHydrated: state }),
 
       login: async (email: string, password: string) => {
         try {
-          const response = await fetch('/api/admin/auth/login', {
+          const response = await fetch(`/api/admin/login`, {
             method: 'POST',
-            credentials: 'include', // Important for cookies
+            credentials: 'include',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ email, password }),
           });
   
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ message: 'Login failed' }));
-            throw new Error(errorData.message || 'Login failed');
+          const data = await response.json();
+          
+          if (!response.ok || data.status === 'error') {
+            throw new Error(data.message || 'Invalid credentials');
           }
-  
-          const admin = await response.json();
-          set({ isAuthenticated: true, admin });
+          
+          if (data.status === 'success' && data.data) {
+            // Store the token in localStorage for axios to use
+            if (data.data.token) {
+              localStorage.setItem('auth-token', data.data.token);
+            }
+            
+            set({ 
+              isAuthenticated: true, 
+              admin: data.data.admin || null,
+              token: data.data.token || null
+            });
+          } else {
+            throw new Error('Invalid response format');
+          }
         } catch (error) {
           console.error("Login error:", error);
           throw error;
@@ -50,46 +65,74 @@ export const useAdminAuthStore = create<AdminState>()(
 
       logout: async () => {
         try {
-          await fetch('/api/admin/auth/logout', {
+          const response = await fetch('/api/admin/logout', {
             method: 'POST',
             credentials: 'include',
           });
+
+          const data = await response.json();
+          
+          if (!response.ok || data.status === 'error') {
+            throw new Error(data.message || 'Logout failed');
+          }
         } catch (error) {
           console.error("Logout error:", error);
         } finally {
-          set({ isAuthenticated: false, admin: null });
+          // Clear the token and state regardless of logout success
+          localStorage.removeItem('auth-token');
+          set({ isAuthenticated: false, admin: null, token: null });
         }
       },
 
       checkAuth: async () => {
         try {
-          const response = await fetch('/api/admin/auth/me', {
+          const response = await fetch(`/api/admin/me`, {
             credentials: 'include',
           });
 
-          if (!response.ok) {
-            set({ isAuthenticated: false, admin: null });
-            return;
+          const data = await response.json();
+          
+          if (!response.ok || data.status === 'error') {
+            throw new Error(data.message || 'Authentication check failed');
           }
-
-          const admin = await response.json();
-          set({ isAuthenticated: true, admin });
+          
+          if (data.status === 'success' && data.data) {
+            // Update token if it's in the response
+            if (data.data.token) {
+              localStorage.setItem('auth-token', data.data.token);
+            }
+            
+            set({ 
+              isAuthenticated: true, 
+              admin: data.data.admin || null,
+              token: data.data.token || localStorage.getItem('auth-token')
+            });
+          } else {
+            throw new Error('Invalid response format');
+          }
         } catch (error) {
           console.error("Auth check error:", error);
-          set({ isAuthenticated: false, admin: null });
+          localStorage.removeItem('auth-token');
+          set({ isAuthenticated: false, admin: null, token: null });
         }
       },
     }),
     {
-      name: 'admin-auth',
+      name: 'admin-auth', 
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ 
         isAuthenticated: state.isAuthenticated,
         admin: state.admin,
+        token: state.token,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.setHydrated(true);
+          
+          // Ensure the token is also in localStorage for axios
+          if (state.token) {
+            localStorage.setItem('auth-token', state.token);
+          }
         }
       },
     }

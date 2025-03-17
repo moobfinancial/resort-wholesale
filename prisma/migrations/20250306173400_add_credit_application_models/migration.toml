@@ -1,3 +1,0 @@
-# Migration 20250306173400_add_credit_application_models
-
-This migration adds the CreditApplication and CreditDocument models to the database.

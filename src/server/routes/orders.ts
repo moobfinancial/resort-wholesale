@@ -28,6 +28,7 @@ router.post(
     body('items.*.variantId').optional().isString().withMessage('Variant ID must be a string'),
     body('paymentMethod').isString().notEmpty().withMessage('Payment method is required'),
     body('useCredit').optional().isBoolean().withMessage('Use credit must be a boolean'),
+    body('notes').optional().isString().withMessage('Notes must be a string'),
   ],
   validateRequest,
   async (req: express.Request, res: express.Response) => {
@@ -41,7 +42,7 @@ router.post(
         });
       }
       
-      const { items, paymentMethod, useCredit = false } = req.body;
+      const { items, paymentMethod, useCredit = false, notes } = req.body;
       
       // Check if customer exists and has enough credit if using credit
       const customer = await prisma.customer.findUnique({
@@ -160,13 +161,19 @@ router.post(
           tax,
           shipping,
           total,
+          notes: notes || null,
           usedCredit: usedCredit > 0 ? usedCredit : null,
           OrderItem: {
             create: orderItems,
           },
         },
         include: {
-          OrderItem: true,
+          OrderItem: {
+            include: {
+              product: true,
+              variant: true,
+            },
+          },
         },
       });
       
@@ -246,8 +253,8 @@ router.get('/', requireAuth, async (req: express.Request, res: express.Response)
       include: {
         OrderItem: {
           include: {
-            Product: true,
-            ProductVariant: true,
+            product: true,
+            variant: true,
           },
         },
       },
@@ -294,8 +301,8 @@ router.get(
         include: {
           OrderItem: {
             include: {
-              Product: true,
-              ProductVariant: true,
+              product: true,
+              variant: true,
             },
           },
         },

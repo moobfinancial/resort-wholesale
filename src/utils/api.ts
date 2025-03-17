@@ -32,12 +32,31 @@ api.interceptors.request.use(
 // Add a response interceptor to handle common errors
 api.interceptors.response.use(
   (response) => {
+    // Transform response to ensure it follows our standard format if not already
+    if (response.data && !response.data.status) {
+      // If response.data doesn't have a status property, wrap it in our standard format
+      response.data = {
+        status: 'success',
+        data: response.data
+      };
+    }
     return response;
   },
   (error) => {
+    // Check if we have a response with data
+    if (error.response && error.response.data) {
+      // If the error response doesn't follow our standard format, format it
+      if (!error.response.data.status) {
+        error.response.data = {
+          status: 'error',
+          message: error.response.data.message || error.message || 'Unknown error occurred',
+          details: error.response.data
+        };
+      }
+    }
+    
     // Handle authentication errors
     if (error.response && error.response.status === 401) {
-      // Optionally redirect to login page or trigger a logout
       console.log('Authentication error: You need to log in');
       
       // If we're not already on the login page, redirect to it
@@ -48,16 +67,10 @@ api.interceptors.response.use(
         // Redirect to login page
         window.location.href = '/admin/login';
       }
-    }
-    
-    // Handle timeout errors
-    if (error.code === 'ECONNABORTED') {
-      console.log('Request timeout: The server took too long to respond');
-    }
-    
-    // Handle network errors
-    if (error.message === 'Network Error') {
-      console.log('Network error: Please check your internet connection');
+    } 
+    // Don't redirect for other errors, let the components handle them
+    else {
+      console.error('API error:', error.response?.data?.message || error.message);
     }
     
     return Promise.reject(error);

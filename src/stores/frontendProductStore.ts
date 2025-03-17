@@ -47,6 +47,7 @@ interface ProductState {
   setQuantity: (quantity: number) => void;
   setCurrentPage: (page: number) => void;
   clearError: () => void;
+  fetchRelatedProducts: (productId: string) => Promise<void>;
 }
 
 export const useProductStore = create<ProductState>((set, get) => ({
@@ -75,17 +76,48 @@ export const useProductStore = create<ProductState>((set, get) => ({
     try {
       const queryParams = params || {};
       const response = await frontendProductApi.listProducts(queryParams);
+      console.log('Products API response:', response);
+      
       if (response.status === 'success' && response.data) {
+        // Handle various possible response structures based on API standards
+        let productsArray = [];
+        let totalCount = 0;
+        
+        // Case 1: data.products (current structure)
+        if (response.data.products && Array.isArray(response.data.products)) {
+          productsArray = response.data.products;
+          totalCount = response.data.total || productsArray.length;
+        }
+        // Case 2: data.items (standardized structure)
+        else if (response.data.items && Array.isArray(response.data.items)) {
+          productsArray = response.data.items;
+          totalCount = response.data.total || productsArray.length;
+        }
+        // Case 3: data is array directly
+        else if (Array.isArray(response.data)) {
+          productsArray = response.data;
+          totalCount = productsArray.length;
+        }
+        // Case 4: Other unexpected structure
+        else {
+          console.error('Unexpected API response structure:', response);
+          throw new Error('Invalid response format - no products array found');
+        }
+        
+        console.log(`Processed ${productsArray.length} products from API response`);
+        
         set({ 
-          products: response.data.products,
-          totalPages: Math.ceil(response.data.total / (queryParams.limit || 12)),
+          products: productsArray,
+          totalPages: Math.ceil(totalCount / (queryParams.limit || 12)),
           currentPage: queryParams.page || 1,
           loading: false 
         });
       } else {
-        throw new Error('Invalid response format');
+        console.error('API response missing success status or data:', response);
+        throw new Error('Invalid response format - missing success status or data');
       }
     } catch (error) {
+      console.error('Error fetching products:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch products',
         loading: false,
@@ -98,7 +130,24 @@ export const useProductStore = create<ProductState>((set, get) => ({
     try {
       const response = await frontendProductApi.getCategories();
       if (response.status === 'success' && response.data) {
-        set({ categories: response.data });
+        // Transform the data to match the expected format
+        const transformedCategories = response.data.map(item => {
+          // If the data already has the correct structure, use it directly
+          if (item.id) {
+            return item;
+          }
+          // If the data has category and count property structure
+          if (item.category) {
+            return {
+              ...item.category,
+              count: item.count
+            };
+          }
+          // Fallback for any other structure
+          return item;
+        });
+        
+        set({ categories: transformedCategories });
       } else {
         throw new Error('Invalid response format');
       }
@@ -110,33 +159,72 @@ export const useProductStore = create<ProductState>((set, get) => ({
     }
   },
   
-  fetchProduct: async (id: string) => {
+  fetchProduct: async (productId: string) => {
     set({ loading: true, error: null });
     try {
-      const [productRes, relatedRes] = await Promise.all([
-        frontendProductApi.getProduct(id),
-        frontendProductApi.getRelatedProducts(id)
-      ]);
-      if (productRes.status === 'success' && relatedRes.status === 'success') {
+      const response = await frontendProductApi.getProduct(productId);
+      console.log('Product API response:', response);
+      
+      if (response.status === 'success' && response.data) {
+        // Extract product data from response, handling different potential formats
+        let productData: Product | null = null;
+        
+        // Handle different response formats
+        if (response.data.item && typeof response.data.item === 'object') {
+          // Standard format with item property
+          productData = response.data.item as Product;
+        } else if (typeof response.data === 'object' && !Array.isArray(response.data)) {
+          // Direct object in data
+          productData = response.data as Product;
+        }
+        
+        if (!productData) {
+          throw new Error('Invalid product data format');
+        }
+        
+        console.log('Product data extracted:', productData);
+        
+        // Fetch related products for this product
+        const relatedResponse = await frontendProductApi.getRelatedProducts(productId);
+        let relatedProducts: Product[] = [];
+        
+        if (relatedResponse.status === 'success') {
+          // Process related products with type safety
+          if (Array.isArray(relatedResponse.data)) {
+            relatedProducts = relatedResponse.data as Product[];
+          } else if (relatedResponse.data && typeof relatedResponse.data === 'object') {
+            if ('items' in relatedResponse.data && Array.isArray(relatedResponse.data.items)) {
+              relatedProducts = relatedResponse.data.items as Product[];
+            }
+          }
+          
+          // Ensure all related products have the required fields
+          relatedProducts = relatedProducts.filter(product => typeof product === 'object' && product !== null);
+        }
+        
+        console.log(`Found ${relatedProducts.length} related products`);
+        
         set({ 
-          currentProduct: productRes.data,
-          relatedProducts: relatedRes.data,
+          currentProduct: productData,
+          relatedProducts,
           loading: false,
-          // Reset variant-related state
-          selectedVariant: null,
-          quantity: 1,
-          calculatedPrice: productRes.data?.price ?? null
+          error: null
         });
         
-        // Fetch variants and bulk pricing if we have a product
-        if (productRes.data) {
-          get().fetchProductVariants(id);
-          get().fetchBulkPricing(id);
+        // Fetch variants and bulk pricing
+        if (productData.id) {
+          get().fetchProductVariants(productData.id);
+          get().fetchBulkPricing(productData.id);
         }
       } else {
-        throw new Error('Invalid response format');
+        if ('message' in response) {
+          throw new Error(response.message as string);
+        } else {
+          throw new Error('Failed to fetch product');
+        }
       }
     } catch (error) {
+      console.error('Failed to fetch product:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch product',
         loading: false,
@@ -147,22 +235,73 @@ export const useProductStore = create<ProductState>((set, get) => ({
   },
   
   fetchProductVariants: async (productId: string) => {
-    set({ variantsLoading: true });
+    set({ variantsLoading: true, error: null });
     try {
+      console.log(`Fetching variants for product ${productId}`);
+      
+      // Use the API client instead of direct fetch
       const response = await frontendProductApi.getProductVariants(productId);
+      
+      console.log('Variants API response:', response);
+      
+      let variantsArray: ProductVariant[] = [];
+      
+      // Follow the standardized API response format
       if (response.status === 'success') {
+        if (Array.isArray(response.data)) {
+          // Direct array
+          variantsArray = response.data;
+          console.log(`Found ${variantsArray.length} variants in direct array format`);
+        } else if (response.data && typeof response.data === 'object') {
+          const data = response.data as any;
+          // Check for items array (standardized format)
+          if (data.items && Array.isArray(data.items)) {
+            variantsArray = data.items;
+            console.log(`Found ${variantsArray.length} variants in data.items format`);
+          } else if (data.variants && Array.isArray(data.variants)) {
+            // Variants in dedicated field
+            variantsArray = data.variants;
+            console.log(`Found ${variantsArray.length} variants in data.variants format`);
+          } else if (data.item) {
+            // Single item response
+            variantsArray = [data.item];
+            console.log('Found single variant in data.item format');
+          } else {
+            console.log('Empty or unexpected response structure:', data);
+            variantsArray = [];
+          }
+        }
+        
+        console.log(`Successfully processed ${variantsArray.length} variants for product ${productId}:`, variantsArray);
+        
+        // Ensure each variant has the required fields
+        const validVariants = variantsArray.filter(variant => 
+          variant && typeof variant === 'object' && 'id' in variant
+        );
+        
+        if (validVariants.length !== variantsArray.length) {
+          console.warn(`Filtered out ${variantsArray.length - validVariants.length} invalid variants`);
+        }
+        
         set({ 
-          productVariants: response.data,
-          variantsLoading: false 
+          productVariants: validVariants,
+          variantsLoading: false,
+          error: null
         });
       } else {
-        throw new Error('Invalid response format');
+        console.error('API returned error status for variants:', response);
+        set({ 
+          variantsLoading: false,
+          productVariants: [],
+          error: response.message || 'Failed to fetch product variants'
+        });
       }
     } catch (error) {
       console.error('Error fetching product variants:', error);
       set({ 
         variantsLoading: false,
-        productVariants: []
+        productVariants: [],
+        error: error instanceof Error ? error.message : 'An unknown error occurred'
       });
     }
   },
@@ -227,15 +366,43 @@ export const useProductStore = create<ProductState>((set, get) => ({
       console.log('Fetching featured products...');
       const response = await frontendProductApi.getFeaturedProducts();
       console.log('Featured products response:', response);
-      if (response.status === 'success' && response.data) {
-        // Debug log to check what's coming from the API
-        console.log('Featured products before setting state:', response.data);
-        set({ featuredProducts: response.data });
+      if (response.status === 'success') {
+        // Handle different possible data structures based on API standards
+        let products: Product[] = [];
+        
+        if (Array.isArray(response.data)) {
+          // Direct array response
+          products = response.data;
+        } else if (response.data && response.data.items) {
+          // Paginated collection with items
+          products = response.data.items;
+        } else if (response.data && Array.isArray(response.data.data)) {
+          // Nested data array
+          products = response.data.data;
+        } else {
+          // Assume it's the correct format
+          products = response.data || [];
+        }
+        
+        // Process image URLs to ensure they're properly formatted
+        const processedProducts = products.map(product => {
+          // Handle product with appropriate type casting
+          const processedProduct = {
+            ...product,
+            imageUrl: typeof product.imageUrl === 'string' 
+              ? formatImageUrl(product.imageUrl) as string
+              : '/images/products/placeholder.svg'
+          };
+          return processedProduct as Product;
+        });
+        
+        console.log('Featured products after processing:', processedProducts);
+        set({ featuredProducts: processedProducts });
       } else {
-        throw new Error('Invalid response format');
+        throw new Error(response.message || 'Invalid response format');
       }
     } catch (error) {
-      console.error('Failed to fetch featured products:', error);
+      console.error('Error fetching featured products:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch featured products',
         featuredProducts: [] 
@@ -248,15 +415,43 @@ export const useProductStore = create<ProductState>((set, get) => ({
       console.log('Fetching new arrivals...');
       const response = await frontendProductApi.getNewArrivals();
       console.log('New arrivals response:', response);
-      if (response.status === 'success' && response.data) {
-        // Debug log to check what's coming from the API
-        console.log('New arrivals before setting state:', response.data);
-        set({ newArrivals: response.data });
+      if (response.status === 'success') {
+        // Handle different possible data structures based on API standards
+        let products: Product[] = [];
+        
+        if (Array.isArray(response.data)) {
+          // Direct array response
+          products = response.data;
+        } else if (response.data && response.data.items) {
+          // Paginated collection with items
+          products = response.data.items;
+        } else if (response.data && Array.isArray(response.data.data)) {
+          // Nested data array
+          products = response.data.data;
+        } else {
+          // Assume it's the correct format
+          products = response.data || [];
+        }
+        
+        // Process image URLs to ensure they're properly formatted
+        const processedProducts = products.map(product => {
+          // Handle product with appropriate type casting
+          const processedProduct = {
+            ...product,
+            imageUrl: typeof product.imageUrl === 'string' 
+              ? formatImageUrl(product.imageUrl) as string
+              : '/images/products/placeholder.svg'
+          };
+          return processedProduct as Product;
+        });
+        
+        console.log('New arrivals after processing:', processedProducts);
+        set({ newArrivals: processedProducts });
       } else {
-        throw new Error('Invalid response format');
+        throw new Error(response.message || 'Invalid response format');
       }
     } catch (error) {
-      console.error('Failed to fetch new arrivals:', error);
+      console.error('Error fetching new arrivals:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch new arrivals',
         newArrivals: [] 
@@ -277,21 +472,23 @@ export const useProductStore = create<ProductState>((set, get) => ({
         // Handle different response formats
         if (Array.isArray(response.data)) {
           processedCollections = response.data;
+        } else if (response.data && response.data.items) {
+          processedCollections = response.data.items;
         } else if (response.data && response.data.collections && Array.isArray(response.data.collections)) {
           processedCollections = response.data.collections;
-        } else if (response.data && Array.isArray(response.data)) {
-          processedCollections = response.data;
+        } else if (response.data && Array.isArray(response.data.data)) {
+          processedCollections = response.data.data;
         } else {
           console.error('Unexpected collections data structure:', response);
           processedCollections = [];
         }
         
-        // Map to ensure all collections have proper structure
+        // Map to ensure all collections have proper structure and image URLs
         const formattedCollections = processedCollections.map((collection: any) => ({
           id: collection.id,
           name: collection.name,
           description: collection.description || '',
-          imageUrl: collection.imageUrl,
+          imageUrl: formatImageUrl(collection.imageUrl),
           productCount: collection.productCount || collection._count?.Product || 0,
           isActive: collection.isActive !== false  // default to true if not specified
         }));
@@ -300,17 +497,13 @@ export const useProductStore = create<ProductState>((set, get) => ({
         set({ collections: formattedCollections, loading: false });
       } else {
         console.error('API error or no data in response:', response);
-        set({ 
-          error: response.message || 'Failed to fetch collections',
-          collections: [],
-          loading: false
-        });
+        throw new Error(response.message || 'Failed to fetch collections');
       }
     } catch (error) {
       console.error('Error fetching collections:', error);
       set({ 
-        error: error instanceof Error ? error.message : 'Failed to fetch collections',
         collections: [],
+        error: error instanceof Error ? error.message : 'Failed to fetch collections',
         loading: false
       });
     }
@@ -370,6 +563,49 @@ export const useProductStore = create<ProductState>((set, get) => ({
     }
   },
   
+  fetchRelatedProducts: async (productId: string) => {
+    try {
+      // Fetch related products
+      const response = await frontendProductApi.getRelatedProducts(productId);
+      
+      if (response.status === 'success') {
+        let relatedData: Product[] = [];
+        
+        // Handle different API response formats
+        if (Array.isArray(response.data)) {
+          relatedData = response.data as Product[];
+        } else if (response.data && typeof response.data === 'object') {
+          if ('items' in response.data && Array.isArray(response.data.items)) {
+            relatedData = response.data.items as Product[];
+          }
+        }
+        
+        // Map related products to ensure correct type
+        const formattedRelated = relatedData.map(product => {
+          if (typeof product === 'object' && product !== null) {
+            return {
+              id: product.id || '',
+              name: product.name || '',
+              price: typeof product.price === 'number' ? product.price : 0,
+              description: product.description || '',
+              imageUrl: product.imageUrl || '',
+              // Include other required properties with defaults
+              ...product
+            };
+          }
+          return null;
+        }).filter((product): product is Product => product !== null);
+        
+        set({ relatedProducts: formattedRelated });
+      } else {
+        set({ relatedProducts: [] });
+      }
+    } catch (error) {
+      console.error('Error fetching related products:', error);
+      set({ relatedProducts: [] });
+    }
+  },
+  
   setCurrentPage: (page: number) => {
     set({ currentPage: page });
     const state = get();
@@ -378,3 +614,29 @@ export const useProductStore = create<ProductState>((set, get) => ({
   
   clearError: () => set({ error: null })
 }));
+
+// Helper function to format image URLs consistently
+function formatImageUrl(url: string | undefined | null): string {
+  if (!url) {
+    return '/images/products/placeholder.svg';
+  }
+  
+  // If URL already has a proper format, return it
+  if (url.startsWith('http') || url.startsWith('/images/')) {
+    return url;
+  }
+  
+  // If URL is just a filename
+  if (!url.includes('/')) {
+    return `/images/products/${url}`;
+  }
+  
+  // Handle URLs that might have the wrong format
+  if (url.startsWith('images/')) {
+    return `/${url}`;
+  }
+  
+  // Extract filename as fallback
+  const filename = url.split('/').pop();
+  return `/images/products/${filename}`;
+}

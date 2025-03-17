@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,98 +7,210 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Admin model for the Admin portal
 model Admin {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  firstName String?
-  lastName  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  role      AdminRole @default(ADMIN)
-}
-
-enum AdminRole {
-  ADMIN
-  SUPER_ADMIN
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Product {
-  id          String   @id @default(uuid())
-  name        String
-  description String
-  price       Decimal  @db.Decimal(10, 2)
-  sku         String   @unique
-  stock       Int      @default(0)
-  minOrder    Int      @default(1)  // Minimum order quantity
-  category    String
-  tags        String[] @default([])
-  imageUrl    String?
-  isActive    Boolean  @default(true)
-  isFeatured  Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Relations
-  ProductVariant ProductVariant[]
+  id             String           @id @default(uuid())
+  name           String
+  description    String
+  category       String
+  tags           String[]
+  price          Decimal          @db.Decimal(10, 2)
+  imageUrl       String
+  sku            String           @unique
+  stock          Int              @default(0)
+  minOrder       Int              @default(1)
+  isActive       Boolean          @default(true)
+  isFeatured     Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  status         ProductStatus    @default(DRAFT)
   BulkPricing    BulkPricing[]
-  supplier       Supplier?    @relation(fields: [supplierId], references: [id])
-  supplierId     String?
-  collectionId   String?
-  collection     Collection?  @relation(fields: [collectionId], references: [id])
   OrderItem      OrderItem[]
-  CartItem       CartItem[]
+  CartItems      CartItem[]
+  Variants       ProductVariant[]
+  Collection     Collection?      @relation("CollectionProducts", fields: [collectionId], references: [id])
+  collectionId   String?
+  ProductImages  ProductImage[]
 }
 
-// Supplier model
-model Supplier {
-  id          String   @id @default(uuid())
-  name        String
-  email       String?
-  phone       String?
-  address     Json?
-  contactName String?
-  status      SupplierStatus @default(ACTIVE)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Relations
-  products    Product[]
-}
-
-enum SupplierStatus {
-  ACTIVE
-  INACTIVE
-  PENDING
-}
-
-// Model for product variants (e.g., different sizes, colors)
-model ProductVariant {
-  id         String  @id @default(uuid())
-  productId  String
-  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sku        String  @unique
-  price      Decimal @db.Decimal(10, 2)
-  stock      Int     @default(0)
-  attributes Json    // Store variant attributes as JSON (e.g., { "color": "red", "size": "XL" })
-  imageUrl   String?
-  
-  // Relations
-  OrderItem  OrderItem[]
-  CartItem   CartItem[]
-}
-
-// Model for bulk pricing tiers
 model BulkPricing {
-  id          String  @id @default(uuid())
+  id          String   @id @default(uuid())
+  minQuantity Int
+  price       Decimal  @db.Decimal(10, 2)
   productId   String
-  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  minQuantity Int     // Minimum quantity required for this price tier
-  price       Decimal @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, minQuantity])
 }
 
-// Collections (categories/groupings of products)
+model Customer {
+  id                    String                  @id @default(uuid())
+  companyName           String
+  contactName           String
+  email                 String                  @unique
+  phone                 String
+  address               Json
+  businessType          String
+  taxId                 String
+  status                CustomerStatus          @default(PENDING)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  password              String
+  creditLimit           Decimal?                @db.Decimal(10, 2)
+  creditStatus          String?
+  CustomerDocuments     CustomerDocument[]
+  CustomerStatusHistory CustomerStatusHistory[]
+  orders                Order[]
+  RequiredDocuments     RequiredDocument[]
+  Carts                 Cart[]
+}
+
+model Order {
+  id            String        @id @default(uuid())
+  orderNumber   String        @unique
+  customerId    String
+  status        OrderStatus   @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
+  paymentMethod String
+  subtotal      Decimal       @db.Decimal(10, 2)
+  tax           Decimal       @db.Decimal(10, 2)
+  shipping      Decimal       @db.Decimal(10, 2)
+  total         Decimal       @db.Decimal(10, 2)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  OrderItems    OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model CustomerDocument {
+  id                 String            @id
+  url                String
+  customerId         String
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime
+  requiredDocumentId String?
+  status             DocumentStatus    @default(PENDING)
+  Customer           Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  RequiredDocument   RequiredDocument? @relation(fields: [requiredDocumentId], references: [id])
+}
+
+model CustomerStatusHistory {
+  id         String         @id
+  status     CustomerStatus
+  comment    String
+  customerId String
+  userId     String
+  createdAt  DateTime       @default(now())
+  Customer   Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  User       User           @relation(fields: [userId], references: [id])
+}
+
+model RequiredDocument {
+  id               String             @id
+  name             String
+  type             String
+  url              String
+  customerId       String
+  status           DocumentStatus     @default(PENDING)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
+  CustomerDocuments CustomerDocument[]
+  Customer         Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id                    String                  @id
+  email                 String                  @unique
+  password              String
+  name                  String
+  role                  UserRole                @default(USER)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime
+  CustomerStatusHistory CustomerStatusHistory[]
+}
+
+model Cart {
+  id         String     @id @default(uuid())
+  customerId String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  customer   Customer   @relation(fields: [customerId], references: [id])
+  items      CartItem[]
+
+  @@index([customerId])
+}
+
+model CartItem {
+  id        String         @id @default(uuid())
+  cartId    String
+  productId String
+  variantId String?
+  quantity  Int
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  cart      Cart          @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product   Product       @relation(fields: [productId], references: [id])
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@index([cartId])
+  @@index([productId])
+  @@index([variantId])
+}
+
+model ProductVariant {
+  id         String     @id @default(uuid())
+  sku        String     @unique
+  price      Decimal    @db.Decimal(10, 2)
+  stock      Int        @default(0)
+  attributes Json
+  imageUrl   String?
+  productId  String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  CartItems  CartItem[]
+
+  @@index([productId])
+}
+
+model ProductImage {
+  id         String          @id @default(uuid())
+  url        String
+  sortOrder  Int             @default(0)
+  productId  String
+  variantId  String?
+  altText    String?
+  isDefault  Boolean         @default(false)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant    ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([variantId])
+}
+
 model Collection {
   id          String    @id @default(uuid())
   name        String
@@ -110,84 +219,55 @@ model Collection {
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  
-  // Relations
-  products    Product[]
+  Products    Product[] @relation("CollectionProducts")
 }
 
-model Customer {
-  id             String    @id @default(uuid())
-  email          String    @unique
-  password       String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  status         CustomerStatus @default(PENDING)
-  phone          String?
-  address        Json?
-  companyName    String?
-  contactName    String?
-  businessType   String?
-  taxId          String?
-  
-  // Credit fields
-  creditLimit       Decimal?  @db.Decimal(10, 2)
-  availableCredit   Decimal?  @db.Decimal(10, 2)
-  creditStatus      CreditStatus? @default(NONE)
-  creditTerm        CreditTerm?
-  creditApprovedAt  DateTime?
-  creditExpiresAt   DateTime?
-  
-  // Relations
-  orders            Order[]
-  cart              Cart?
-  creditApplications CreditApplication[]
+model Supplier {
+  id          String           @id @default(uuid())
+  name        String
+  email       String           @unique
+  phone       String
+  address     Json
+  contactName String
+  website     String?
+  notes       String?
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  orders      SupplierOrder[]
+}
+
+model SupplierOrder {
+  id           String               @id @default(uuid())
+  orderNumber  String               @unique
+  supplierId   String
+  status       String               @default("PENDING")
+  total        Decimal              @db.Decimal(10, 2)
+  notes        String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  supplier     Supplier             @relation(fields: [supplierId], references: [id])
+  orderItems   SupplierOrderItem[]
+}
+
+model SupplierOrderItem {
+  id              String        @id @default(uuid())
+  supplierOrderId String
+  productName     String
+  sku             String?
+  quantity        Int
+  price           Decimal       @db.Decimal(10, 2)
+  total           Decimal       @db.Decimal(10, 2)
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  supplierOrder   SupplierOrder @relation(fields: [supplierOrderId], references: [id], onDelete: Cascade)
 }
 
 enum CustomerStatus {
-  ACTIVE
-  INACTIVE
   PENDING
-  BANNED
-}
-
-enum CreditStatus {
-  NONE
-  PENDING
-  APPROVED
+  VERIFIED
   REJECTED
-  EXPIRED
-}
-
-enum CreditTerm {
-  DAYS_30
-  DAYS_90
-  DAYS_180
-}
-
-model Order {
-  id           String       @id @default(uuid())
-  orderNumber  String       @unique
-  customerId   String
-  customer     Customer     @relation(fields: [customerId], references: [id])
-  status       OrderStatus  @default(PENDING)
-  paymentStatus PaymentStatus @default(PENDING)
-  paymentMethod String
-  subtotal     Decimal      @db.Decimal(10, 2)
-  tax          Decimal      @db.Decimal(10, 2)
-  shipping     Decimal      @db.Decimal(10, 2)
-  total        Decimal      @db.Decimal(10, 2)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  
-  // Stripe payment fields
-  stripePaymentIntentId String?
-  stripeClientSecret    String?
-  
-  // Credit fields
-  usedCredit   Decimal?    @db.Decimal(10, 2)
-  
-  // Relations
-  OrderItem    OrderItem[]
 }
 
 enum OrderStatus {
@@ -203,87 +283,24 @@ enum PaymentStatus {
   PENDING
   PAID
   FAILED
-  REFUNDED
-}
-
-model OrderItem {
-  id           String   @id @default(uuid())
-  orderId      String
-  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId    String
-  product      Product  @relation(fields: [productId], references: [id])
-  variantId    String?
-  variant      ProductVariant? @relation(fields: [variantId], references: [id])
-  quantity     Int
-  price        Decimal  @db.Decimal(10, 2)
-  total        Decimal  @db.Decimal(10, 2)
-}
-
-// Cart model
-model Cart {
-  id          String     @id @default(uuid())
-  customerId  String     @unique
-  customer    Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  
-  // Relations
-  items       CartItem[]
-}
-
-// Cart item model
-model CartItem {
-  id          String   @id @default(uuid())
-  cartId      String
-  cart        Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  variantId   String?
-  variant     ProductVariant? @relation(fields: [variantId], references: [id])
-  quantity    Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@unique([cartId, productId, variantId])
-}
-
-// Credit application model
-model CreditApplication {
-  id          String              @id @default(uuid())
-  customerId  String
-  customer    Customer            @relation(fields: [customerId], references: [id])
-  amount      Decimal             @db.Decimal(10, 2)
-  term        CreditTerm
-  status      CreditApplicationStatus @default(PENDING)
-  notes       String?
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  
-  // Relations
-  documents   CreditDocument[]
-}
-
-enum CreditApplicationStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-// Credit document model
-model CreditDocument {
-  id                  String      @id @default(uuid())
-  creditApplicationId String
-  creditApplication   CreditApplication @relation(fields: [creditApplicationId], references: [id], onDelete: Cascade)
-  url                 String
-  type                String
-  status              DocumentStatus @default(PENDING)
-  notes               String?
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
 }
 
 enum DocumentStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum ProductStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
 }
