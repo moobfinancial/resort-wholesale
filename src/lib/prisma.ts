@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from "@prisma/client";
 
 declare global {
   var prisma: PrismaClient | undefined;
@@ -7,8 +7,8 @@ declare global {
 // Create a new PrismaClient instance with better logging
 const createPrismaClient = () => {
   return new PrismaClient({
-    log: ['error', 'warn'],
-    errorFormat: 'pretty',
+    log: ["error", "warn"],
+    errorFormat: "pretty",
   });
 };
 
@@ -18,33 +18,38 @@ export const prisma = global.prisma || createPrismaClient();
 // Initialize connection with retry mechanism
 async function connectWithRetry(retries = 5, delay = 2000) {
   let currentTry = 0;
-  
+
   while (currentTry < retries) {
     try {
       // Test the connection with a simple query
       await prisma.$queryRaw`SELECT 1 as result`;
-      console.log('Successfully connected to the database');
+      console.log("Successfully connected to the database");
       return true;
     } catch (error) {
       currentTry++;
-      console.error(`Database connection attempt ${currentTry}/${retries} failed:`, error);
-      
+      console.error(
+        `Database connection attempt ${currentTry}/${retries} failed:`,
+        error
+      );
+
       if (currentTry >= retries) {
-        console.error('All database connection attempts failed. Please check your database configuration.');
+        console.error(
+          "All database connection attempts failed. Please check your database configuration."
+        );
         // Let the application continue but with warnings
         return false;
       }
-      
+
       // Wait before next retry
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
   return false;
 }
 
 // Wait for initial database connection when the module is loaded
-export const prismaConnected = connectWithRetry().catch(err => {
-  console.error('Failed to establish database connection:', err);
+export const prismaConnected = connectWithRetry().catch((err) => {
+  console.error("Failed to establish database connection:", err);
   return false;
 });
 
@@ -54,11 +59,11 @@ export const isPrismaConnected = async () => {
     await prisma.$queryRaw`SELECT 1 as result`;
     return true;
   } catch (error) {
-    console.error('Prisma connection check failed:', error);
+    console.error("Prisma connection check failed:", error);
     return false;
   }
 };
 
-if (process.env.NODE_ENV !== 'production') {
+if (import.meta.env.NODE_ENV !== "production") {
   global.prisma = prisma;
 }
