@@ -7,7 +7,7 @@
     "dev": "cross-env DEBUG=app:* concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "vite",
     "dev:server": "cross-env DEBUG=app:* tsx watch src/server/index.ts",
-    "build": "tsc && vite build",
+    "build": "NODE_ENV=production tsc && vite build",
     "build:server": "tsc -p tsconfig.server.json && node scripts/fix-imports.js",
     "lint": "eslint .",
     "preview": "vite preview",
