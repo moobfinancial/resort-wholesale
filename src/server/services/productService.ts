@@ -3,6 +3,10 @@ import { Decimal } from "@prisma/client/runtime/library";
 import crypto from "crypto";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const prisma = new PrismaClient();
 
@@ -483,9 +487,11 @@ export const productService = {
 
         // Ensure imageUrl has the correct format
         if (product.imageUrl) {
+          console.log("product.imageUrl", product.imageUrl);
           if (
             !product.imageUrl.startsWith("/images/products/") &&
-            !product.imageUrl.startsWith("http")
+            !product.imageUrl.startsWith("http") &&
+            !product.imageUrl.startsWith("/uploads/products/")
           ) {
             // If it starts with images/ but missing the leading slash
             if (product.imageUrl.startsWith("images/products/")) {
@@ -497,6 +503,9 @@ export const productService = {
                 filename || product.imageUrl
               }`;
             }
+          } else {
+            // eslint-disable-next-line no-self-assign
+            product.imageUrl = product.imageUrl;
           }
         }
       }

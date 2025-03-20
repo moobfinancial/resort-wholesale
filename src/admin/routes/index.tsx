@@ -1,20 +1,24 @@
-import React, { Suspense } from 'react';
-import { RouteObject } from 'react-router-dom';
-import AdminLayout from '../layouts/AdminLayout';
-import { ProtectedRoute, PublicRoute } from './RouteWrappers';
-import Login from '../pages/Login';
-import CustomerList from '../pages/customers/CustomerList';
-import CustomerDetails from '../pages/customers/CustomerDetails';
-import VerificationQueue from '../pages/customers/VerificationQueue';
-import GeneralSettings from '../pages/settings/GeneralSettings';
-import UserManagement from '../pages/settings/UserManagement';
-import SupplierManagement from '../pages/settings/SupplierManagement';
-import { BulkPricingPage, ProductStatusPage, StockManagementPage } from '../components/ProductManagement';
+import React, { Suspense } from "react";
+import { RouteObject } from "react-router-dom";
+import AdminLayout from "../layouts/AdminLayout";
+import { ProtectedRoute, PublicRoute } from "./RouteWrappers";
+import Login from "../pages/Login";
+import CustomerList from "../pages/customers/CustomerList";
+import CustomerDetails from "../pages/customers/CustomerDetails";
+import VerificationQueue from "../pages/customers/VerificationQueue";
+import GeneralSettings from "../pages/settings/GeneralSettings";
+import UserManagement from "../pages/settings/UserManagement";
+import SupplierManagement from "../pages/settings/SupplierManagement";
+import {
+  BulkPricingPage,
+  ProductStatusPage,
+  StockManagementPage,
+} from "../components/ProductManagement";
 
 // Admin routes configuration
 export const adminRoutes: RouteObject[] = [
   {
-    path: '/admin',
+    path: "/admin",
     element: (
       <ProtectedRoute>
         <AdminLayout />
@@ -24,44 +28,52 @@ export const adminRoutes: RouteObject[] = [
       {
         index: true,
         async lazy() {
-          const { default: Dashboard } = await import('../pages/Dashboard');
+          const { default: Dashboard } = await import("../pages/Dashboard");
           return { Component: Dashboard };
         },
       },
       // Products Management
       {
-        path: 'products',
+        path: "products",
         children: [
           {
             index: true,
             async lazy() {
-              const { default: ProductList } = await import('../../components/admin/products/ProductList');
+              const { default: ProductList } = await import(
+                "../../components/admin/products/ProductList"
+              );
               return { Component: ProductList };
             },
           },
           {
-            path: 'new',
+            path: "new",
             async lazy() {
-              const { default: ProductForm } = await import('../../components/admin/products/ProductForm');
+              const { default: ProductForm } = await import(
+                "../../components/admin/products/ProductForm"
+              );
               return { Component: ProductForm };
             },
           },
           {
-            path: ':id',
+            path: ":id",
             async lazy() {
-              const { default: ProductView } = await import('../../components/admin/products/ProductView');
+              const { default: ProductView } = await import(
+                "../../components/admin/products/ProductView"
+              );
               return { Component: ProductView };
             },
           },
           {
-            path: ':id/edit',
+            path: ":id/edit",
             async lazy() {
-              const { default: EditProduct } = await import('../../components/admin/products/EditProduct');
+              const { default: EditProduct } = await import(
+                "../../components/admin/products/EditProduct"
+              );
               return { Component: EditProduct };
             },
           },
           {
-            path: ':id/bulk-pricing',
+            path: ":id/bulk-pricing",
             element: (
               <Suspense fallback={<div>Loading...</div>}>
                 <BulkPricingPage />
@@ -69,7 +81,7 @@ export const adminRoutes: RouteObject[] = [
             ),
           },
           {
-            path: ':id/status',
+            path: ":id/status",
             element: (
               <Suspense fallback={<div>Loading...</div>}>
                 <ProductStatusPage />
@@ -80,10 +92,10 @@ export const adminRoutes: RouteObject[] = [
       },
       // Inventory Management
       {
-        path: 'inventory',
+        path: "inventory",
         children: [
           {
-            path: 'stock',
+            path: "stock",
             element: (
               <Suspense fallback={<div>Loading...</div>}>
                 <StockManagementPage />
@@ -91,9 +103,11 @@ export const adminRoutes: RouteObject[] = [
             ),
           },
           {
-            path: 'adjustments',
+            path: "adjustments",
             async lazy() {
-              const { default: StockAdjustment } = await import('../../components/admin/inventory/StockAdjustment');
+              const { default: StockAdjustment } = await import(
+                "../../components/admin/inventory/StockAdjustment"
+              );
               return { Component: StockAdjustment };
             },
           },
@@ -101,37 +115,41 @@ export const adminRoutes: RouteObject[] = [
       },
       // Business Customer Management
       {
-        path: 'customers',
+        path: "customers",
         children: [
           {
             index: true,
             element: <CustomerList />,
           },
           {
-            path: ':id',
+            path: ":id",
             element: <CustomerDetails />,
           },
           {
-            path: 'verification',
+            path: "verification",
             element: <VerificationQueue />,
           },
         ],
       },
       // Order Management
       {
-        path: 'orders',
+        path: "orders",
         children: [
           {
             index: true,
             async lazy() {
-              const { default: OrderList } = await import('../pages/orders/OrderList');
+              const { default: OrderList } = await import(
+                "../pages/orders/OrderList"
+              );
               return { Component: OrderList };
             },
           },
           {
-            path: ':id',
+            path: ":id",
             async lazy() {
-              const { default: OrderDetails } = await import('../pages/orders/OrderDetails');
+              const { default: OrderDetails } = await import(
+                "../pages/orders/OrderDetails"
+              );
               return { Component: OrderDetails };
             },
           },
@@ -139,18 +157,18 @@ export const adminRoutes: RouteObject[] = [
       },
       // Settings
       {
-        path: 'settings',
+        path: "settings",
         children: [
           {
             index: true,
             element: <GeneralSettings />,
           },
           {
-            path: 'users',
+            path: "users",
             element: <UserManagement />,
           },
           {
-            path: 'suppliers',
+            path: "suppliers",
             element: <SupplierManagement />,
           },
         ],
@@ -158,7 +176,7 @@ export const adminRoutes: RouteObject[] = [
     ],
   },
   {
-    path: '/admin/login',
+    path: "/admin/login",
     element: (
       <PublicRoute>
         <Login />

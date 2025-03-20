@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Card,
   Table,
@@ -13,18 +13,19 @@ import {
   Switch,
   Image,
   message,
-} from 'antd';
+} from "antd";
 import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
   UploadOutlined,
   ShoppingOutlined,
-} from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
-import type { UploadFile } from 'antd/es/upload/interface';
-import api from '../../../utils/api';
-import { useNavigate } from 'react-router-dom';
+} from "@ant-design/icons";
+import type { ColumnsType } from "antd/es/table";
+import type { UploadFile } from "antd/es/upload/interface";
+import api from "../../../utils/api";
+import { useNavigate } from "react-router-dom";
+import { Product } from "@prisma/client";
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -38,14 +39,16 @@ interface Collection {
   createdAt: string;
   updatedAt: string;
   productCount?: number;
-  products?: any[];
+  products?: Product[];
 }
 
 const CollectionManagement: React.FC = () => {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
+  const [editingCollection, setEditingCollection] = useState<Collection | null>(
+    null
+  );
   const [imageFile, setImageFile] = useState<UploadFile[]>([]);
   const [form] = Form.useForm();
   const navigate = useNavigate();
@@ -57,24 +60,26 @@ const CollectionManagement: React.FC = () => {
   const fetchCollections = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/collections');
-      
+      const response = await api.get("/collections");
+
       const { data } = response;
-      
-      if (data && data.status === 'success' && data.data) {
-        const collections = data.data.collections || [];
-        const processedCollections = collections.map((collection: Collection) => ({
-          ...collection,
-          imageUrl: processImageUrl(collection.imageUrl),
-          productCount: collection.products?.length || 0
-        }));
+      if (data && data.status === "success" && data.data) {
+        const collections = data.data.items || [];
+
+        const processedCollections = collections.map(
+          (collection: Collection) => ({
+            ...collection,
+            imageUrl: processImageUrl(collection.imageUrl),
+            productCount: collection.products?.length || 0,
+          })
+        );
         setCollections(processedCollections);
       } else {
-        throw new Error(data?.message || 'Failed to list collections');
+        throw new Error(data?.message || "Failed to list collections");
       }
     } catch (error) {
-      console.error('Failed to fetch collections:', error);
-      message.error('Failed to fetch collections');
+      console.error("Failed to fetch collections:", error);
+      message.error("Failed to fetch collections");
       setCollections([]);
     } finally {
       setLoading(false);
@@ -83,63 +88,77 @@ const CollectionManagement: React.FC = () => {
 
   const processImageUrl = (imageUrl: string | null | undefined): string => {
     if (!imageUrl) {
-      return '/images/collections/collection-1741193035768-61315048.jpg'; // Default placeholder
+      return "/images/collections/collection-1741193035768-61315048.jpg"; // Default placeholder
     }
-    
+
     // If URL is already properly formatted, return it
-    if (imageUrl.startsWith('/images/collections/') || imageUrl.startsWith('http')) {
+    if (
+      imageUrl.startsWith("/uploads/collections/") ||
+      imageUrl.startsWith("http")
+    ) {
       return imageUrl;
     }
-    
+
     // Handle paths starting with /images/categories/ (old format)
-    if (imageUrl.startsWith('/images/categories/') || imageUrl.startsWith('images/categories/')) {
-      const filename = imageUrl.split('/').pop();
-      return `/images/collections/${filename}`;
+    if (
+      imageUrl.startsWith("/images/categories/") ||
+      imageUrl.startsWith("images/categories/")
+    ) {
+      const filename = imageUrl.split("/").pop();
+      return `/uploads/collections/${filename}`;
     }
-    
+
     // If URL is just a filename or path without proper prefix
-    if (imageUrl.startsWith('images/collections/')) {
-      return '/' + imageUrl;
+    if (imageUrl.startsWith("uploads/collections/")) {
+      return "/" + imageUrl;
     }
-    
+
     // Extract filename and add proper prefix
-    const filename = imageUrl.split('/').pop();
-    return `/images/collections/${filename}`;
+    const filename = imageUrl.split("/").pop();
+    return `/uploads/collections/${filename}`;
   };
 
-  const handleAddEdit = async (values: any) => {
+  const handleAddEdit = async (values: { [x: string]: string | Blob }) => {
     try {
       const formData = new FormData();
-      Object.keys(values).forEach(key => {
-        if (key !== 'image') {
+      Object.keys(values).forEach((key) => {
+        if (key !== "image") {
           formData.append(key, values[key]);
         }
       });
 
       if (imageFile.length > 0 && imageFile[0].originFileObj) {
-        formData.append('image', imageFile[0].originFileObj);
+        formData.append("image", imageFile[0].originFileObj);
       }
 
       let response;
       if (editingCollection) {
         // Update existing collection
-        response = await api.put(`/collections/${editingCollection.id}`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-        if (response.data?.status === 'success') {
-          message.success('Collection updated successfully');
+        response = await api.put(
+          `/collections/${editingCollection.id}`,
+          formData,
+          {
+            headers: { "Content-Type": "multipart/form-data" },
+          }
+        );
+        if (response.data?.status === "success") {
+          message.success("Collection updated successfully");
         } else {
-          throw new Error(response.data?.message || 'Failed to update collection');
+          throw new Error(
+            response.data?.message || "Failed to update collection"
+          );
         }
       } else {
         // Create new collection
-        response = await api.post('/collections', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+        response = await api.post("/collections", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
         });
-        if (response.data?.status === 'success') {
-          message.success('Collection created successfully');
+        if (response.data?.status === "success") {
+          message.success("Collection created successfully");
         } else {
-          throw new Error(response.data?.message || 'Failed to create collection');
+          throw new Error(
+            response.data?.message || "Failed to create collection"
+          );
         }
       }
 
@@ -148,44 +167,46 @@ const CollectionManagement: React.FC = () => {
       form.resetFields();
       setImageFile([]);
     } catch (error) {
-      console.error('Failed to save collection:', error);
-      message.error('Failed to save collection');
+      console.error("Failed to save collection:", error);
+      message.error("Failed to save collection");
     }
   };
 
   const handleDelete = async (id: string) => {
     try {
       const response = await api.delete(`/collections/${id}`);
-      if (response.data?.status === 'success') {
-        message.success('Collection deleted successfully');
+      if (response.data?.status === "success") {
+        message.success("Collection deleted successfully");
         fetchCollections();
       } else {
-        throw new Error(response.data?.message || 'Failed to delete collection');
+        throw new Error(
+          response.data?.message || "Failed to delete collection"
+        );
       }
     } catch (error) {
-      console.error('Failed to delete collection:', error);
-      message.error('Failed to delete collection');
+      console.error("Failed to delete collection:", error);
+      message.error("Failed to delete collection");
     }
   };
 
   const showModal = (collection?: Collection) => {
     setEditingCollection(collection || null);
-    
+
     if (collection) {
       form.setFieldsValue({
         name: collection.name,
         description: collection.description,
         isActive: collection.isActive,
       });
-      
+
       if (collection.imageUrl) {
         // Process the image URL to ensure it's properly formatted
         const processedImageUrl = processImageUrl(collection.imageUrl);
         setImageFile([
           {
-            uid: '-1',
-            name: 'collection-image.jpg',
-            status: 'done',
+            uid: "-1",
+            name: "collection-image.jpg",
+            status: "done",
             url: processedImageUrl,
           },
         ]);
@@ -196,69 +217,69 @@ const CollectionManagement: React.FC = () => {
       form.resetFields();
       setImageFile([]);
     }
-    
+
     setModalVisible(true);
   };
 
   const columns: ColumnsType<Collection> = [
     {
-      title: 'Image',
-      dataIndex: 'imageUrl',
-      key: 'imageUrl',
+      title: "Image",
+      dataIndex: "imageUrl",
+      key: "imageUrl",
       render: (imageUrl: string) => (
         <Image
           src={imageUrl}
           alt="Collection"
-          style={{ width: 50, height: 50, objectFit: 'cover' }}
+          style={{ width: 50, height: 50, objectFit: "cover" }}
           preview={false}
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            // Try with collections path
-            if (!target.src.includes('/images/collections/')) {
-              const filename = imageUrl.split('/').pop();
-              target.src = `/images/collections/${filename || 'collection-1741193035768-61315048.jpg'}`;
-            } else {
-              // Fallback to placeholder
-              target.src = '/images/collections/collection-1741193035768-61315048.jpg';
-            }
-          }}
+          // onError={(e) => {
+          //   const target = e.target as HTMLImageElement;
+          //   // Try with collections path
+          //   if (!target.src.includes('/images/collections/')) {
+          //     const filename = imageUrl.split('/').pop();
+          //     target.src = `/images/collections/${filename || 'collection-1741193035768-61315048.jpg'}`;
+          //   } else {
+          //     // Fallback to placeholder
+          //     target.src = '/images/collections/collection-1741193035768-61315048.jpg';
+          //   }
+          // }}
         />
       ),
     },
     {
-      title: 'Name',
-      dataIndex: 'name',
-      key: 'name',
+      title: "Name",
+      dataIndex: "name",
+      key: "name",
     },
     {
-      title: 'Description',
-      dataIndex: 'description',
-      key: 'description',
+      title: "Description",
+      dataIndex: "description",
+      key: "description",
       ellipsis: true,
     },
     {
-      title: 'Products',
-      dataIndex: 'productCount',
-      key: 'productCount',
+      title: "Products",
+      dataIndex: "productCount",
+      key: "productCount",
       render: (productCount: number) => productCount || 0,
     },
     {
-      title: 'Status',
-      dataIndex: 'isActive',
-      key: 'isActive',
+      title: "Status",
+      dataIndex: "isActive",
+      key: "isActive",
       render: (isActive: boolean) => (
         <span>
           {isActive ? (
-            <span style={{ color: 'green' }}>Active</span>
+            <span style={{ color: "green" }}>Active</span>
           ) : (
-            <span style={{ color: 'red' }}>Inactive</span>
+            <span style={{ color: "red" }}>Inactive</span>
           )}
         </span>
       ),
     },
     {
-      title: 'Actions',
-      key: 'actions',
+      title: "Actions",
+      key: "actions",
       render: (_, record) => (
         <Space size="middle">
           <Button
@@ -311,7 +332,7 @@ const CollectionManagement: React.FC = () => {
         />
 
         <Modal
-          title={editingCollection ? 'Edit Collection' : 'Add Collection'}
+          title={editingCollection ? "Edit Collection" : "Add Collection"}
           open={modalVisible}
           onCancel={() => {
             setModalVisible(false);
@@ -331,29 +352,22 @@ const CollectionManagement: React.FC = () => {
             <Form.Item
               name="name"
               label="Name"
-              rules={[{ required: true, message: 'Please enter collection name' }]}
+              rules={[
+                { required: true, message: "Please enter collection name" },
+              ]}
             >
               <Input />
             </Form.Item>
 
-            <Form.Item
-              name="description"
-              label="Description"
-            >
+            <Form.Item name="description" label="Description">
               <TextArea rows={4} />
             </Form.Item>
 
-            <Form.Item
-              name="isActive"
-              label="Active"
-              valuePropName="checked"
-            >
+            <Form.Item name="isActive" label="Active" valuePropName="checked">
               <Switch />
             </Form.Item>
 
-            <Form.Item
-              label="Image"
-            >
+            <Form.Item label="Image">
               <Upload
                 listType="picture-card"
                 fileList={imageFile}
@@ -380,15 +394,17 @@ const CollectionManagement: React.FC = () => {
 
             <Form.Item className="mb-0 text-right">
               <Space>
-                <Button onClick={() => {
-                  setModalVisible(false);
-                  form.resetFields();
-                  setImageFile([]);
-                }}>
+                <Button
+                  onClick={() => {
+                    setModalVisible(false);
+                    form.resetFields();
+                    setImageFile([]);
+                  }}
+                >
                   Cancel
                 </Button>
                 <Button type="primary" htmlType="submit">
-                  {editingCollection ? 'Update' : 'Create'}
+                  {editingCollection ? "Update" : "Create"}
                 </Button>
               </Space>
             </Form.Item>

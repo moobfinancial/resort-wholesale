@@ -1,19 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useProductStore } from '../../../stores/productStore';
-import ProductForm from './ProductForm';
-import toast from 'react-hot-toast';
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useProductStore } from "../../../stores/productStore";
+import ProductForm from "./ProductForm";
+import toast from "react-hot-toast";
 
 export default function EditProduct() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getProduct, updateProduct, selectedProduct, loading, error } = useProductStore();
+  const { getProduct, updateProduct, selectedProduct, loading, error } =
+    useProductStore();
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     const loadProduct = async () => {
       if (!id) {
-        navigate('/admin/inventory');
+        navigate("/admin/inventory");
         return;
       }
 
@@ -21,8 +22,10 @@ export default function EditProduct() {
         await getProduct(id);
         setIsInitialized(true);
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to load product');
-        navigate('/admin/inventory');
+        toast.error(
+          error instanceof Error ? error.message : "Failed to load product"
+        );
+        navigate("/admin/inventory");
       }
     };
 
@@ -38,11 +41,7 @@ export default function EditProduct() {
   }
 
   if (error) {
-    return (
-      <div className="text-center text-red-600 mt-8">
-        {error}
-      </div>
-    );
+    return <div className="text-center text-red-600 mt-8">{error}</div>;
   }
 
   if (!selectedProduct) {
@@ -53,29 +52,32 @@ export default function EditProduct() {
     <div className="px-4 sm:px-6 lg:px-8">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
-          <h1 className="text-base font-semibold leading-6 text-gray-900">Edit Product</h1>
+          <h1 className="text-base font-semibold leading-6 text-gray-900">
+            Edit Product
+          </h1>
           <p className="mt-2 text-sm text-gray-700">
             Make changes to {selectedProduct.name}
           </p>
         </div>
       </div>
       <div className="mt-8">
-        <ProductForm 
-          initialValues={selectedProduct} 
+        <ProductForm
+          initialValues={selectedProduct}
           onSave={async (formData) => {
             try {
-              console.log('Received FormData from ProductForm');
-              
+              console.log("Received FormData from ProductForm");
+
               // Use the update product function from your store
               await updateProduct(id!, formData);
-              toast.success('Product updated successfully');
-              navigate('/admin/products');
+              toast.success("Product updated successfully");
+              navigate("/admin/products");
             } catch (error) {
-              toast.error('Failed to update product');
-              console.error('Error updating product:', error);
+              toast.error("Failed to update product");
+              console.error("Error updating product:", error);
             }
           }}
           isSubmitting={loading}
+          isEdit={true}
         />
       </div>
     </div>

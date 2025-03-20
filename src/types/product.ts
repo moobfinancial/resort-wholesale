@@ -24,8 +24,8 @@ export interface ProductVariant {
   productId: string;
   sku: string;
   price: number;
-  stock: number;
-  attributes: Record<string, any>;
+  stock?: number;
+  attributes: Record<string, unknown>;
   imageUrl?: string;
   images?: ProductImage[];
   createdAt?: Date;
@@ -64,21 +64,32 @@ export interface Product {
   bulkPricing?: BulkPricing[];
   images?: ProductImage[];
 }
-
+interface Address {
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+}
 export interface Supplier {
   id: string;
   name: string;
   contactPerson: string;
   email: string;
   phone: string;
-  address: any;
+  address: Address;
   website?: string;
   logo?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
   category: string;
   subcategory?: string;
   paymentTerms: string;
   documents: string[];
 }
 
-export type ProductStatus = 'DRAFT' | 'PENDING_REVIEW' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
+export type ProductStatus =
+  | "DRAFT"
+  | "PENDING_REVIEW"
+  | "APPROVED"
+  | "PUBLISHED"
+  | "ARCHIVED";

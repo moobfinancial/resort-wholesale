@@ -1,6 +1,6 @@
-import { prisma } from '../../lib/prisma';
-import { BulkPricing } from '@prisma/client';
-import crypto from 'crypto';
+import { prisma } from "../../lib/prisma";
+import { BulkPricing } from "@prisma/client";
+import crypto from "crypto";
 
 interface BulkPricingInput {
   id?: string;
@@ -16,10 +16,10 @@ export const bulkPricingService = {
     try {
       return await prisma.bulkPricing.findMany({
         where: { productId },
-        orderBy: { minQuantity: 'asc' },
+        orderBy: { minQuantity: "asc" },
       });
     } catch (error) {
-      console.error('Error fetching bulk pricing tiers:', error);
+      console.error("Error fetching bulk pricing tiers:", error);
       return [];
     }
   },
@@ -28,7 +28,10 @@ export const bulkPricingService = {
    * Update bulk pricing tiers for a product
    * This replaces all existing tiers with the new ones
    */
-  updateProductTiers: async (productId: string, tiers: BulkPricingInput[]): Promise<boolean> => {
+  updateProductTiers: async (
+    productId: string,
+    tiers: BulkPricingInput[]
+  ): Promise<boolean> => {
     try {
       // Start a transaction to ensure data consistency
       await prisma.$transaction(async (tx) => {
@@ -40,10 +43,10 @@ export const bulkPricingService = {
         // Create the new tiers
         if (tiers.length > 0) {
           await tx.bulkPricing.createMany({
-            data: tiers.map(tier => ({
+            data: tiers.map((tier) => ({
               productId,
-              minQuantity: tier.minQuantity,
-              price: tier.price,
+              minQuantity: Number(tier.minQuantity),
+              price: Number(tier.price),
               updatedAt: new Date(), // Add updatedAt field
             })),
           });
@@ -52,7 +55,7 @@ export const bulkPricingService = {
 
       return true;
     } catch (error) {
-      console.error('Error updating bulk pricing tiers:', error);
+      console.error("Error updating bulk pricing tiers:", error);
       return false;
     }
   },
@@ -60,19 +63,22 @@ export const bulkPricingService = {
   /**
    * Add a single bulk pricing tier
    */
-  addTier: async (productId: string, tier: BulkPricingInput): Promise<BulkPricing | null> => {
+  addTier: async (
+    productId: string,
+    tier: BulkPricingInput
+  ): Promise<BulkPricing | null> => {
     try {
       return await prisma.bulkPricing.create({
         data: {
           id: crypto.randomUUID(), // Generate a unique ID
           productId,
-          minQuantity: tier.minQuantity,
-          price: tier.price,
+          minQuantity: Number(tier.minQuantity),
+          price: Number(tier.price),
           updatedAt: new Date(), // Add updatedAt field
         },
       });
     } catch (error) {
-      console.error('Error adding bulk pricing tier:', error);
+      console.error("Error adding bulk pricing tier:", error);
       return null;
     }
   },
@@ -80,7 +86,10 @@ export const bulkPricingService = {
   /**
    * Update a single bulk pricing tier
    */
-  updateTier: async (tierId: string, data: Partial<BulkPricingInput>): Promise<BulkPricing | null> => {
+  updateTier: async (
+    tierId: string,
+    data: Partial<BulkPricingInput>
+  ): Promise<BulkPricing | null> => {
     try {
       return await prisma.bulkPricing.update({
         where: { id: tierId },
@@ -91,7 +100,7 @@ export const bulkPricingService = {
         },
       });
     } catch (error) {
-      console.error('Error updating bulk pricing tier:', error);
+      console.error("Error updating bulk pricing tier:", error);
       return null;
     }
   },
@@ -106,7 +115,7 @@ export const bulkPricingService = {
       });
       return true;
     } catch (error) {
-      console.error('Error deleting bulk pricing tier:', error);
+      console.error("Error deleting bulk pricing tier:", error);
       return false;
     }
   },
@@ -115,7 +124,10 @@ export const bulkPricingService = {
    * Get the price for a product based on quantity
    * Returns the base price if no bulk pricing matches
    */
-  getPriceForQuantity: async (productId: string, quantity: number): Promise<number | null> => {
+  getPriceForQuantity: async (
+    productId: string,
+    quantity: number
+  ): Promise<number | null> => {
     try {
       // Get the product first to get the base price
       const product = await prisma.product.findUnique({
@@ -136,7 +148,7 @@ export const bulkPricingService = {
           },
         },
         orderBy: {
-          minQuantity: 'desc', // Get the highest tier that's still below the quantity
+          minQuantity: "desc", // Get the highest tier that's still below the quantity
         },
       });
 
@@ -147,7 +159,7 @@ export const bulkPricingService = {
 
       return Number(tier.price);
     } catch (error) {
-      console.error('Error calculating bulk price:', error);
+      console.error("Error calculating bulk price:", error);
       return null;
     }
   },
@@ -156,34 +168,40 @@ export const bulkPricingService = {
    * Calculate price for a given quantity
    * This is a public-facing method that returns a fallback price if there's an error
    */
-  calculatePriceForQuantity: async (productId: string, quantity: number): Promise<number> => {
+  calculatePriceForQuantity: async (
+    productId: string,
+    quantity: number
+  ): Promise<number> => {
     try {
-      const price = await bulkPricingService.getPriceForQuantity(productId, quantity);
-      
+      const price = await bulkPricingService.getPriceForQuantity(
+        productId,
+        quantity
+      );
+
       if (price === null) {
         // Get the base product price if bulk pricing calculation fails
         const product = await prisma.product.findUnique({
           where: { id: productId },
           select: { price: true },
         });
-        
+
         return product ? Number(product.price) : 0;
       }
-      
+
       return price;
     } catch (error) {
-      console.error('Error in calculatePriceForQuantity:', error);
-      
+      console.error("Error in calculatePriceForQuantity:", error);
+
       // Attempt to get the base product price as a fallback
       try {
         const product = await prisma.product.findUnique({
           where: { id: productId },
           select: { price: true },
         });
-        
+
         return product ? Number(product.price) : 0;
       } catch (fallbackError) {
-        console.error('Error getting fallback price:', fallbackError);
+        console.error("Error getting fallback price:", fallbackError);
         return 0;
       }
     }

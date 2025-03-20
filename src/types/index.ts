@@ -2,7 +2,7 @@ export interface Product {
   id: string;
   name: string;
   description: string;
-  category: 'jewelry' | 'swimwear' | 'accessories';
+  category: "jewelry" | "swimwear" | "accessories";
   images: string[];
   retailPrice: number;
   wholesalePrice: number;
@@ -30,9 +30,10 @@ export interface User {
   wishlist: string[];
 }
 
-export type PricingMode = 'retail' | 'wholesale';
+export type PricingMode = "retail" | "wholesale";
 
 export interface Collection {
+  _count: number;
   id: string;
   name: string;
   description: string;
