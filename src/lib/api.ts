@@ -1179,7 +1179,7 @@ export const frontendProductApi = {
   getProductVariants: async (productId: string) => {
     try {
       console.log(`Fetching variants for product ${productId}`);
-      const response = await request<any>(`products/${productId}/variants`);
+      const response = await request<any>(`variants/${productId}/variants`);
       console.log(`Raw variants response for product ${productId}:`, response);
 
       // Handle response according to the consistent API response format from MEMORIES
