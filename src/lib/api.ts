@@ -72,7 +72,6 @@ async function request<T>(
 ): Promise<ApiResponse<T>> {
   const apiBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:5177";
   // Handle endpoints with or without leading slash
-  console.log("endpoint in request", endpoint);
   const normalizedEndpoint = endpoint.startsWith("/")
     ? endpoint.substring(1)
     : endpoint;
@@ -81,10 +80,7 @@ async function request<T>(
     /([^:]\/)\/+/g,
     "$1"
   );
-  console.log("first url", url);
-  console.log("normalizedEndpoint url", normalizedEndpoint);
   // Log the URL for debugging
-  console.log(`Making API request to: ${url}`);
 
   // Set default headers with proper typing
   const headers: Record<string, string> = {
@@ -144,7 +140,6 @@ async function request<T>(
     }
 
     const data = await response.json();
-    console.log(`API response for ${url}:`, data);
 
     // Standardize the response following our API standards
     if (data) {
@@ -453,9 +448,7 @@ export const api = {
       productId: string
     ): Promise<ApiResponse<ProductVariant[]>> => {
       try {
-        console.log(`Fetching variants for product ${productId}`);
         const response = await request<any>(`variants/${productId}/variants`);
-        console.log(`Raw variant response for product ${productId}:`, response);
 
         // Handle response according to the consistent API response format from MEMORIES
         if (response && response.status === "success") {
@@ -465,9 +458,6 @@ export const api = {
           if (Array.isArray(response.data)) {
             // Direct array in data field
             variants = response.data;
-            console.log(
-              `Found ${variants.length} variants in direct array format`
-            );
           } else if (response.data && typeof response.data === "object") {
             // Check for nested structures
             if (
@@ -476,28 +466,17 @@ export const api = {
             ) {
               // Standard format with items array
               variants = response.data.items;
-              console.log(
-                `Found ${variants.length} variants in data.items format`
-              );
             } else if (
               "variants" in response.data &&
               Array.isArray(response.data.variants)
             ) {
               // Variants in dedicated field
               variants = response.data.variants;
-              console.log(
-                `Found ${variants.length} variants in data.variants format`
-              );
             } else if ("item" in response.data && response.data.item) {
               // Single item response
               variants = [response.data.item];
-              console.log("Found single variant in data.item format");
             }
           }
-
-          console.log(
-            `Successfully processed ${variants.length} variants for product ${productId}`
-          );
 
           return {
             status: "success",
@@ -543,7 +522,6 @@ export const api = {
       productId: string,
       variantData: Partial<ProductVariant>
     ): Promise<ApiResponse<ProductVariant>> => {
-      console.log("variantData", variantData);
       return api.put<ProductVariant>(
         `variants/${productId}/variants/${variantId}`,
         variantData
@@ -612,32 +590,25 @@ const formatImageUrl = (
 
   // Handle case where we receive just a string URL instead of a product object
   if (typeof input === "string") {
-    console.log("formatImageUrl received string URL:", input);
     let imageUrl = input;
 
     // Normalize null strings
     if (imageUrl === "null" || imageUrl === "undefined") {
-      console.log('Normalizing "null" or "undefined" string to empty string');
       imageUrl = "";
     } else if (imageUrl.startsWith("http") || imageUrl.startsWith("https")) {
       // External URL - keep as is
-      console.log("External URL detected, keeping as is:", imageUrl);
     } else if (imageUrl.startsWith("/images/")) {
       // Already has relative path - keep as is
-      console.log("Relative path detected, keeping as is:", imageUrl);
     } else if (!imageUrl.startsWith("/")) {
       // If it doesn't start with /, add the product images path
-      console.log("Adding product path to filename:", imageUrl);
       imageUrl = `/images/products/${imageUrl}`;
     }
 
     // If imageUrl is null after processing, set a default product image
     if (!imageUrl) {
-      console.log("Setting placeholder image for string input");
       imageUrl = "/images/products/placeholder.svg";
     }
 
-    console.log("Final formatted image URL from string input:", imageUrl);
     return imageUrl;
   }
 
@@ -645,11 +616,11 @@ const formatImageUrl = (
   const formattedProduct = { ...input };
 
   // Log product details for debugging
-  console.log("Formatting image URL for product:", {
-    id: formattedProduct.id,
-    name: formattedProduct.name,
-    originalImageUrl: formattedProduct.imageUrl,
-  });
+  // console.log("Formatting image URL for product:", {
+  //   id: formattedProduct.id,
+  //   name: formattedProduct.name,
+  //   originalImageUrl: formattedProduct.imageUrl,
+  // });
 
   // Check if the imageUrl exists and is a valid string
   if (
@@ -661,50 +632,50 @@ const formatImageUrl = (
       formattedProduct.imageUrl === "null" ||
       formattedProduct.imageUrl === "undefined"
     ) {
-      console.log('Normalizing "null" or "undefined" string to empty string');
+      // console.log('Normalizing "null" or "undefined" string to empty string');
       formattedProduct.imageUrl = "";
     } else if (
       formattedProduct.imageUrl.startsWith("http") ||
       formattedProduct.imageUrl.startsWith("https")
     ) {
       // External URL - keep as is
-      console.log(
-        "External URL detected, keeping as is:",
-        formattedProduct.imageUrl
-      );
+      // console.log(
+      //   "External URL detected, keeping as is:",
+      //   formattedProduct.imageUrl
+      // );
     } else if (formattedProduct.imageUrl.startsWith("/images/")) {
       // Already has relative path - keep as is
-      console.log(
-        "Relative path detected, keeping as is:",
-        formattedProduct.imageUrl
-      );
+      // console.log(
+      //   "Relative path detected, keeping as is:",
+      //   formattedProduct.imageUrl
+      // );
     } else if (!formattedProduct.imageUrl.startsWith("/")) {
       // If it doesn't start with /, add the product images path
-      console.log(
-        "Adding product path to filename:",
-        formattedProduct.imageUrl
-      );
+      // console.log(
+      //   "Adding product path to filename:",
+      //   formattedProduct.imageUrl
+      // );
       formattedProduct.imageUrl = `/images/products/${formattedProduct.imageUrl}`;
     }
   } else {
     // Handle non-string or empty imageUrl
-    console.log(
-      "Product imageUrl is not a valid string:",
-      formattedProduct.imageUrl
-    );
+    // console.log(
+    //   "Product imageUrl is not a valid string:",
+    //   formattedProduct.imageUrl
+    // );
     formattedProduct.imageUrl = null;
   }
 
   // If imageUrl is still empty, null, undefined after processing, set a default product image
   if (!formattedProduct.imageUrl) {
-    console.log(
-      "Setting placeholder image for product:",
-      formattedProduct.id || "unknown product"
-    );
+    // console.log(
+    //   "Setting placeholder image for product:",
+    //   formattedProduct.id || "unknown product"
+    // );
     formattedProduct.imageUrl = "/images/products/placeholder.svg";
   }
 
-  console.log("Final formatted image URL:", formattedProduct.imageUrl);
+  // console.log("Final formatted image URL:", formattedProduct.imageUrl);
   return formattedProduct;
 };
 
