@@ -395,7 +395,7 @@ export default function ProductDetail() {
         setImagesLoading(true);
         console.log(`Fetching images for variant ${selectedVariant.id}`);
         const response = await api.get<any>(
-          `products/variants/${selectedVariant.id}/images`
+          `products/variants/${selectedVariant?.id}/images`
         );
         console.log(
           `Raw variant images response for variant ${selectedVariant.id}:`,
@@ -453,10 +453,10 @@ export default function ProductDetail() {
         setImagesLoading(false);
       }
     };
-
+    console.log("porducts", productVariants);
     fetchVariantImages();
-  }, [selectedVariant]);
-
+  }, [selectedVariant?.id, id]);
+  console.log("selectedVariant", selectedVariant);
   useEffect(() => {
     // Show error via useEffect instead of during render
     if (error) {
