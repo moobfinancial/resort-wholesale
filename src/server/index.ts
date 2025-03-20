@@ -364,10 +364,10 @@ app.use("/api/customers-simplified", customerSimplifiedRoutes); // No auth versi
 app.use("/api/admin/inventory", inventoryRoutes);
 app.use("/api/admin/inventory-reports", inventoryReportRoutes);
 app.use("/api/products", productRoutes);
-app.use("/api/products", productVariantRoutes);
+// app.use("/api/products", productVariantRoutes);
 app.use("/api/variants", productVariantRoutes); // Add direct access to variant routes
-app.use("/api/products", bulkPricingRoutes);
-app.use("/api/products", productImageRoutes);
+app.use("/api/products-bulk-pricing", bulkPricingRoutes);
+app.use("/api/product-images", productImageRoutes);
 app.use("/api/admin", adminRoutes); // Mount admin routes at /api/admin
 app.use("/api/admin/orders", adminOrdersRoutes);
 app.use("/api/business-customers", businessCustomerRoutes);

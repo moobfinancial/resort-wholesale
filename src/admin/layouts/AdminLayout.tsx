@@ -1,55 +1,63 @@
-import { Fragment, useState, useEffect } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  Home, 
-  Package, 
-  ShoppingBag, 
-  Users, 
-  Settings, 
-  Menu, 
+import { Fragment, useState, useEffect } from "react";
+import { Dialog, Transition } from "@headlessui/react";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  Home,
+  Package,
+  ShoppingBag,
+  Users,
+  Settings,
+  Menu,
   LogOut,
   ShoppingBasket,
   Truck,
   Grid,
-  CreditCard
-} from 'lucide-react';
-import { useAdminAuthStore } from '../../stores/adminAuth';
+  CreditCard,
+} from "lucide-react";
+import { useAdminAuthStore } from "../../stores/adminAuth";
 
 const navigation = [
-  { name: 'Dashboard', href: '/admin', icon: Home },
-  { name: 'Products', href: '/admin/products', icon: ShoppingBasket },
-  { name: 'Collections', href: '/admin/collections', icon: Grid },
-  { name: 'Inventory', href: '/admin/inventory', icon: Package },
-  { name: 'Orders', href: '/admin/orders', icon: ShoppingBag },
-  { name: 'Customers', href: '/admin/customers', icon: Users },
-  { name: 'Credit Applications', href: '/admin/credit/applications', icon: CreditCard },
-  { name: 'Suppliers', href: '/admin/suppliers', icon: Truck },
-  { name: 'Settings', href: '/admin/settings', icon: Settings },
+  { name: "Dashboard", href: "/admin", icon: Home },
+  { name: "Products", href: "/admin/products", icon: ShoppingBasket },
+  { name: "Collections", href: "/admin/collections", icon: Grid },
+  { name: "Inventory", href: "/admin/inventory", icon: Package },
+  { name: "Orders", href: "/admin/orders", icon: ShoppingBag },
+  { name: "Customers", href: "/admin/customers", icon: Users },
+  {
+    name: "Credit Applications",
+    href: "/admin/credit/applications",
+    icon: CreditCard,
+  },
+  { name: "Suppliers", href: "/admin/suppliers", icon: Truck },
+  { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { admin, logout, isAuthenticated } = useAdminAuthStore();
+  const { logout, isAuthenticated } = useAdminAuthStore();
 
   const handleLogout = async () => {
     await logout();
-    navigate('/admin/login');
+    navigate("/admin/login");
   };
 
   // Check authentication status
   useEffect(() => {
     if (!isAuthenticated) {
-      navigate('/admin/login');
+      navigate("/admin/login");
     }
   }, [isAuthenticated, navigate]);
 
   return (
     <div className="min-h-screen bg-gray-100">
       <Transition.Root show={sidebarOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-50 lg:hidden" onClose={setSidebarOpen}>
+        <Dialog
+          as="div"
+          className="relative z-50 lg:hidden"
+          onClose={setSidebarOpen}
+        >
           <Transition.Child
             as={Fragment}
             enter="transition-opacity ease-linear duration-300"
@@ -91,15 +99,18 @@ export default function AdminLayout() {
                                 to={item.href}
                                 className={`
                                   group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold
-                                  ${location.pathname === item.href
-                                    ? 'bg-gray-50 text-primary-600'
-                                    : 'text-gray-700 hover:text-primary-600 hover:bg-gray-50'
+                                  ${
+                                    location.pathname === item.href
+                                      ? "bg-gray-50 text-primary-600"
+                                      : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
                                   }
                                 `}
                               >
                                 <item.icon
                                   className={`h-6 w-6 shrink-0 ${
-                                    location.pathname === item.href ? 'text-primary-600' : 'text-gray-400 group-hover:text-primary-600'
+                                    location.pathname === item.href
+                                      ? "text-primary-600"
+                                      : "text-gray-400 group-hover:text-primary-600"
                                   }`}
                                   aria-hidden="true"
                                 />
@@ -150,15 +161,18 @@ export default function AdminLayout() {
                         to={item.href}
                         className={`
                           group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold
-                          ${location.pathname === item.href
-                            ? 'bg-gray-50 text-primary-600'
-                            : 'text-gray-700 hover:text-primary-600 hover:bg-gray-50'
+                          ${
+                            location.pathname === item.href
+                              ? "bg-gray-50 text-primary-600"
+                              : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
                           }
                         `}
                       >
                         <item.icon
                           className={`h-6 w-6 shrink-0 ${
-                            location.pathname === item.href ? 'text-primary-600' : 'text-gray-400 group-hover:text-primary-600'
+                            location.pathname === item.href
+                              ? "text-primary-600"
+                              : "text-gray-400 group-hover:text-primary-600"
                           }`}
                           aria-hidden="true"
                         />

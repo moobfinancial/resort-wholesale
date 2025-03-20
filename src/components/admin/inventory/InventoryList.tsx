@@ -1,27 +1,27 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, Filter, AlertTriangle } from 'lucide-react';
-import { useProductStore } from '../../../stores/productStore';
-import toast from 'react-hot-toast';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Search, Filter, AlertTriangle } from "lucide-react";
+import { useProductStore } from "../../../stores/productStore";
 
 export default function InventoryList() {
   const { products, fetchProducts } = useProductStore();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchProducts();
   }, []);
 
-  const categories = Array.from(new Set(products.map(p => p.category)));
+  const categories = Array.from(new Set(products.map((p) => p.category)));
 
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = 
+  const filteredProducts = products.filter((product) => {
+    const matchesSearch =
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.sku.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCategory = !selectedCategory || product.category === selectedCategory;
+
+    const matchesCategory =
+      !selectedCategory || product.category === selectedCategory;
 
     return matchesSearch && matchesCategory;
   });
@@ -30,7 +30,9 @@ export default function InventoryList() {
     <div className="px-4 sm:px-6 lg:px-8">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
-          <h1 className="text-base font-semibold leading-6 text-gray-900">Inventory Management</h1>
+          <h1 className="text-base font-semibold leading-6 text-gray-900">
+            Inventory Management
+          </h1>
           <p className="mt-2 text-sm text-gray-700">
             Manage stock levels, track inventory, and handle stock adjustments
           </p>
@@ -82,22 +84,40 @@ export default function InventoryList() {
               <table className="min-w-full divide-y divide-gray-300">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
+                    <th
+                      scope="col"
+                      className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6"
+                    >
                       Product
                     </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                    <th
+                      scope="col"
+                      className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                    >
                       SKU
                     </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                    <th
+                      scope="col"
+                      className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                    >
                       Current Stock
                     </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                    <th
+                      scope="col"
+                      className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                    >
                       Min Stock
                     </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                    <th
+                      scope="col"
+                      className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                    >
                       Status
                     </th>
-                    <th scope="col" className="relative py-3.5 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                    <th
+                      scope="col"
+                      className="relative py-3.5 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
+                    >
                       <span className="sr-only">Actions</span>
                     </th>
                   </tr>
@@ -115,48 +135,52 @@ export default function InventoryList() {
                                   className="h-10 w-10 rounded-full object-cover"
                                   src={product.imageUrl}
                                   alt={product.name}
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    const currentSrc = target.src;
-                                    console.log('Image load failed initially in inventory list:', product.imageUrl);
-                                    
-                                    // Prevent infinite loop - if already trying to load placeholder, stop
-                                    if (currentSrc.includes('placeholder') || currentSrc.includes('data:image')) {
-                                      console.log('Already using placeholder, stopping error handling');
-                                      return;
-                                    }
-                                    
-                                    // Step 1: Make sure the URL has the proper format
-                                    if (!currentSrc.includes('/images/products/')) {
-                                      console.log('Trying with /images/products/ path');
-                                      // Try to get just the filename if it's a path
-                                      const filename = product.imageUrl.split('/').pop();
-                                      if (filename) {
-                                        target.src = `/images/products/${filename}`;
-                                        console.log('New image path:', target.src);
-                                        return; // Exit early to give this a chance to load
-                                      }
-                                    } 
-                                    // Step 2: If still failing with images/products path, try uploads path
-                                    else if (!currentSrc.includes('placeholder')) {
-                                      console.log('Image with correct path still failing, trying uploads directory');
-                                      const filename = product.imageUrl.split('/').pop();
-                                      if (filename) {
-                                        target.src = `/uploads/products/${filename}`;
-                                        return; // Exit early to give this a chance to load
-                                      }
-                                    }
-                                    
-                                    // Fallback to placeholder image
-                                    console.log('Using placeholder image for:', product.imageUrl);
-                                    target.src = '/images/products/placeholder.jpg';
-                                  }}
+                                  // onError={(e) => {
+                                  //   const target = e.target as HTMLImageElement;
+                                  //   const currentSrc = target.src;
+                                  //   console.log('Image load failed initially in inventory list:', product.imageUrl);
+
+                                  //   // Prevent infinite loop - if already trying to load placeholder, stop
+                                  //   if (currentSrc.includes('placeholder') || currentSrc.includes('data:image')) {
+                                  //     console.log('Already using placeholder, stopping error handling');
+                                  //     return;
+                                  //   }
+
+                                  //   // Step 1: Make sure the URL has the proper format
+                                  //   if (!currentSrc.includes('/images/products/')) {
+                                  //     console.log('Trying with /images/products/ path');
+                                  //     // Try to get just the filename if it's a path
+                                  //     const filename = product.imageUrl.split('/').pop();
+                                  //     if (filename) {
+                                  //       target.src = `/images/products/${filename}`;
+                                  //       console.log('New image path:', target.src);
+                                  //       return; // Exit early to give this a chance to load
+                                  //     }
+                                  //   }
+                                  //   // Step 2: If still failing with images/products path, try uploads path
+                                  //   else if (!currentSrc.includes('placeholder')) {
+                                  //     console.log('Image with correct path still failing, trying uploads directory');
+                                  //     const filename = product.imageUrl.split('/').pop();
+                                  //     if (filename) {
+                                  //       target.src = `/uploads/products/${filename}`;
+                                  //       return; // Exit early to give this a chance to load
+                                  //     }
+                                  //   }
+
+                                  //   // Fallback to placeholder image
+                                  //   console.log('Using placeholder image for:', product.imageUrl);
+                                  //   target.src = '/images/products/placeholder.jpg';
+                                  // }}
                                 />
                               </div>
                             )}
                             <div className="ml-4">
-                              <div className="font-medium text-gray-900">{product.name}</div>
-                              <div className="text-gray-500">{product.category}</div>
+                              <div className="font-medium text-gray-900">
+                                {product.name}
+                              </div>
+                              <div className="text-gray-500">
+                                {product.category}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -173,8 +197,8 @@ export default function InventoryList() {
                           <span
                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                               isLowStock
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-green-100 text-green-800'
+                                ? "bg-red-100 text-red-800"
+                                : "bg-green-100 text-green-800"
                             }`}
                           >
                             {isLowStock ? (
@@ -183,14 +207,18 @@ export default function InventoryList() {
                                 Low Stock
                               </>
                             ) : (
-                              'In Stock'
+                              "In Stock"
                             )}
                           </span>
                         </td>
                         <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                           <div className="flex justify-end gap-2">
                             <button
-                              onClick={() => navigate(`/admin/inventory/adjust/${product.id}`)}
+                              onClick={() =>
+                                navigate(
+                                  `/admin/inventory/adjust/${product.id}`
+                                )
+                              }
                               className="text-blue-600 hover:text-blue-900"
                             >
                               <span className="inline-flex items-center">

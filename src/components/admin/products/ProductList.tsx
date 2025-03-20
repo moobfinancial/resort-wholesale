@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus, Search, Filter, Eye, Edit, Trash2 } from 'lucide-react';
-import { useProductStore } from '../../../stores/productStore';
-import toast from 'react-hot-toast';
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Plus, Search, Filter, Eye, Edit, Trash2 } from "lucide-react";
+import { useProductStore } from "../../../stores/productStore";
+import toast from "react-hot-toast";
 
 export default function ProductList() {
   const { products, fetchProducts, deleteProduct } = useProductStore();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,8 +20,10 @@ export default function ProductList() {
         await fetchProducts();
         setError(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load products');
-        console.error('Error loading products:', err);
+        setError(
+          err instanceof Error ? err.message : "Failed to load products"
+        );
+        console.error("Error loading products:", err);
       } finally {
         setLoading(false);
       }
@@ -34,21 +36,26 @@ export default function ProductList() {
   const categories = Array.from(
     new Set(
       products
-        .filter(p => p && p.category) // Filter out undefined products or those without category
-        .map(p => p.category)
+        .filter((p) => p && p.category) // Filter out undefined products or those without category
+        .map((p) => p.category)
     )
   );
 
-  const filteredProducts = products.filter(product => {
+  const filteredProducts = products.filter((product) => {
     // Skip invalid products
     if (!product) return false;
 
-    const matchesSearch = 
-      (product.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (product.description?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      product.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesCategory = !selectedCategory || product.category === selectedCategory;
+    const matchesSearch =
+      (product.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+      (product.description?.toLowerCase() || "").includes(
+        searchTerm.toLowerCase()
+      ) ||
+      product.tags?.some((tag) =>
+        tag.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+
+    const matchesCategory =
+      !selectedCategory || product.category === selectedCategory;
 
     return matchesSearch && matchesCategory;
   });
@@ -56,14 +63,16 @@ export default function ProductList() {
   const handleDelete = async (productId: string) => {
     if (!productId) return;
 
-    if (window.confirm('Are you sure you want to delete this product?')) {
+    if (window.confirm("Are you sure you want to delete this product?")) {
       setIsDeleting(productId);
       try {
         await deleteProduct(productId);
         await fetchProducts(); // Refresh the list after deletion
-        toast.success('Product deleted successfully');
+        toast.success("Product deleted successfully");
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to delete product');
+        toast.error(
+          error instanceof Error ? error.message : "Failed to delete product"
+        );
       } finally {
         setIsDeleting(null);
       }
@@ -74,7 +83,9 @@ export default function ProductList() {
     <div className="px-4 sm:px-6 lg:px-8">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
-          <h1 className="text-base font-semibold leading-6 text-gray-900">Products</h1>
+          <h1 className="text-base font-semibold leading-6 text-gray-900">
+            Products
+          </h1>
           <p className="mt-2 text-sm text-gray-700">
             A list of all products in your store
           </p>
@@ -84,7 +95,10 @@ export default function ProductList() {
             to="/admin/products/new"
             className="block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
           >
-            <Plus className="inline-block -ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
+            <Plus
+              className="inline-block -ml-0.5 mr-1.5 h-5 w-5"
+              aria-hidden="true"
+            />
             Add Product
           </Link>
         </div>
@@ -94,7 +108,9 @@ export default function ProductList() {
         <div className="mt-4 rounded-md bg-red-50 p-4">
           <div className="flex">
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error loading products</h3>
+              <h3 className="text-sm font-medium text-red-800">
+                Error loading products
+              </h3>
               <div className="mt-2 text-sm text-red-700">{error}</div>
             </div>
           </div>
@@ -153,22 +169,40 @@ export default function ProductList() {
                 <table className="min-w-full divide-y divide-gray-300">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
+                      <th
+                        scope="col"
+                        className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6"
+                      >
                         Product
                       </th>
-                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                      <th
+                        scope="col"
+                        className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                      >
                         Category
                       </th>
-                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                      <th
+                        scope="col"
+                        className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                      >
                         Price
                       </th>
-                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                      <th
+                        scope="col"
+                        className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                      >
                         Stock
                       </th>
-                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                      <th
+                        scope="col"
+                        className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                      >
                         Status
                       </th>
-                      <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                      <th
+                        scope="col"
+                        className="relative py-3.5 pl-3 pr-4 sm:pr-6"
+                      >
                         <span className="sr-only">Actions</span>
                       </th>
                     </tr>
@@ -176,7 +210,10 @@ export default function ProductList() {
                   <tbody className="divide-y divide-gray-200 bg-white">
                     {filteredProducts.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-4 pl-4 pr-3 text-sm text-gray-500 sm:pl-6 text-center">
+                        <td
+                          colSpan={6}
+                          className="py-4 pl-4 pr-3 text-sm text-gray-500 sm:pl-6 text-center"
+                        >
                           No products found matching your filters.
                         </td>
                       </tr>
@@ -191,77 +228,87 @@ export default function ProductList() {
                                     className="h-10 w-10 rounded-full object-cover"
                                     src={product.imageUrl}
                                     alt={product.name}
-                                    onError={(e) => {
-                                      const target = e.target as HTMLImageElement;
-                                      const currentSrc = target.src;
-                                      console.log('Image load failed initially:', product.imageUrl || 'no image url');
-                                      
-                                      // Prevent infinite loop - if already trying to load placeholder, stop
-                                      if (currentSrc.includes('placeholder') || currentSrc.includes('data:image')) {
-                                        console.log('Already using placeholder, stopping error handling');
-                                        return;
-                                      }
-                                      
-                                      // Step 1: Make sure the URL has the proper format
-                                      if (!currentSrc.includes('/images/products/')) {
-                                        console.log('Trying with /images/products/ path');
-                                        // Try to get just the filename if it's a path
-                                        const filename = (product.imageUrl || '').split('/').pop();
-                                        if (filename) {
-                                          target.src = `/images/products/${filename}`;
-                                          console.log('New image path:', target.src);
-                                          return; // Exit early to give this a chance to load
-                                        }
-                                      } 
-                                      // Step 2: If still failing with images/products path, try uploads path
-                                      else if (!currentSrc.includes('placeholder')) {
-                                        console.log('Image with correct path still failing, trying uploads directory');
-                                        const filename = (product.imageUrl || '').split('/').pop();
-                                        if (filename) {
-                                          target.src = `/uploads/products/${filename}`;
-                                          return; // Exit early to give this a chance to load
-                                        }
-                                      }
-                                      
-                                      // Fallback to placeholder image
-                                      console.log('Using placeholder image for:', product.imageUrl || 'no image url');
-                                      target.src = '/images/products/placeholder.jpg';
-                                    }}
+                                    // onError={(e) => {
+                                    //   const target = e.target as HTMLImageElement;
+                                    //   const currentSrc = target.src;
+                                    //   console.log('Image load failed initially:', product.imageUrl || 'no image url');
+
+                                    //   // Prevent infinite loop - if already trying to load placeholder, stop
+                                    //   if (currentSrc.includes('placeholder') || currentSrc.includes('data:image')) {
+                                    //     console.log('Already using placeholder, stopping error handling');
+                                    //     return;
+                                    //   }
+
+                                    //   // Step 1: Make sure the URL has the proper format
+                                    //   if (!currentSrc.includes('/images/products/')) {
+                                    //     console.log('Trying with /images/products/ path');
+                                    //     // Try to get just the filename if it's a path
+                                    //     const filename = (product.imageUrl || '').split('/').pop();
+                                    //     if (filename) {
+                                    //       target.src = `/images/products/${filename}`;
+                                    //       console.log('New image path:', target.src);
+                                    //       return; // Exit early to give this a chance to load
+                                    //     }
+                                    //   }
+                                    //   // Step 2: If still failing with images/products path, try uploads path
+                                    //   else if (!currentSrc.includes('placeholder')) {
+                                    //     console.log('Image with correct path still failing, trying uploads directory');
+                                    //     const filename = (product.imageUrl || '').split('/').pop();
+                                    //     if (filename) {
+                                    //       target.src = `/uploads/products/${filename}`;
+                                    //       return; // Exit early to give this a chance to load
+                                    //     }
+                                    //   }
+
+                                    //   // Fallback to placeholder image
+                                    //   console.log('Using placeholder image for:', product.imageUrl || 'no image url');
+                                    //   target.src = '/images/products/placeholder.jpg';
+                                    // }}
                                   />
                                 ) : (
                                   <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                    <span className="text-xs text-gray-500">{product.name.charAt(0).toUpperCase()}</span>
+                                    <span className="text-xs text-gray-500">
+                                      {product.name.charAt(0).toUpperCase()}
+                                    </span>
                                   </div>
                                 )}
                               </div>
                               <div className="ml-4">
-                                <div className="font-medium text-gray-900">{product.name}</div>
-                                <div className="text-gray-500">{product.sku || 'No SKU'}</div>
+                                <div className="font-medium text-gray-900">
+                                  {product.name}
+                                </div>
+                                <div className="text-gray-500">
+                                  {product.sku || "No SKU"}
+                                </div>
                               </div>
                             </div>
                           </td>
-                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{product.category}</td>
                           <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                            ${typeof product.price === 'number' 
-                              ? product.price.toFixed(2)
-                              : typeof product.price === 'string'
-                                ? parseFloat(product.price).toFixed(2)
-                                : '0.00'
-                            }
+                            {product.category}
                           </td>
-                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{product.stock}</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                            $
+                            {typeof product.price === "number"
+                              ? product.price.toFixed(2)
+                              : typeof product.price === "string"
+                              ? parseFloat(product.price).toFixed(2)
+                              : "0.00"}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                            {product.stock}
+                          </td>
                           <td className="whitespace-nowrap px-3 py-4 text-sm">
-                            {product.status === 'PUBLISHED' && (
+                            {product.status === "PUBLISHED" && (
                               <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
                                 Published
                               </span>
                             )}
-                            {product.status === 'DRAFT' && (
+                            {product.status === "DRAFT" && (
                               <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
                                 Draft
                               </span>
                             )}
-                            {product.status === 'PENDING_REVIEW' && (
+                            {product.status === "PENDING_REVIEW" && (
                               <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
                                 Pending Review
                               </span>
@@ -286,7 +333,10 @@ export default function ProductList() {
                                 disabled={isDeleting === product.id}
                                 className="text-red-600 hover:text-red-900 disabled:opacity-50"
                               >
-                                <Trash2 className="h-5 w-5" aria-hidden="true" />
+                                <Trash2
+                                  className="h-5 w-5"
+                                  aria-hidden="true"
+                                />
                               </button>
                             </div>
                           </td>

@@ -1,33 +1,36 @@
-import { prisma } from '../../lib/prisma';
-import type { ProductVariant } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
-import crypto from 'crypto';
+import { prisma } from "../../lib/prisma";
+import type { ProductVariant } from "@prisma/client";
+import { Decimal } from "@prisma/client/runtime/library";
+import crypto from "crypto";
 
 /**
  * Utility function to normalize image URLs to ensure consistent path formats
  */
 const normalizeImageUrl = (imageUrl?: string | null): string => {
-  if (!imageUrl) return '/images/products/placeholder.svg';
-  
+  if (!imageUrl) return "/images/products/placeholder.svg";
+
   // If URL is already properly formatted, return it
-  if (imageUrl.startsWith('/images/products/') || imageUrl.startsWith('http')) {
+  if (imageUrl.startsWith("/images/products/") || imageUrl.startsWith("http")) {
     return imageUrl;
   }
-  
+
   // If URL is a relative path starting with images/ but missing the leading slash
-  if (imageUrl.startsWith('images/products/')) {
-    return '/' + imageUrl;
+  if (imageUrl.startsWith("images/products/")) {
+    return "/" + imageUrl;
   }
-  
+
   // If URL is from the old uploads path format
-  if (imageUrl.startsWith('/uploads/products/') || imageUrl.startsWith('uploads/products/')) {
-    const filename = imageUrl.split('/').pop();
-    return `/images/products/${filename || 'placeholder.svg'}`;
+  if (
+    imageUrl.startsWith("/uploads/products/") ||
+    imageUrl.startsWith("uploads/products/")
+  ) {
+    const filename = imageUrl.split("/").pop();
+    return `/uploads/products/${filename || "placeholder.svg"}`;
   }
-  
+
   // If URL is just a filename or a non-standard path
-  const filename = imageUrl.split('/').pop();
-  return `/images/products/${filename || 'placeholder.svg'}`;
+  const filename = imageUrl.split("/").pop();
+  return `/uploads/products/${filename || "placeholder.svg"}`;
 };
 
 type ProductVariantInput = {
@@ -36,7 +39,7 @@ type ProductVariantInput = {
   sku: string;
   price: number;
   stock: number;
-  attributes: Record<string, any>;
+  attributes: Record<string, string | number | boolean>;
   imageUrl?: string;
 };
 
@@ -52,10 +55,10 @@ export const productVariantService = {
     try {
       return await prisma.productVariant.findMany({
         where: { productId },
-        orderBy: { createdAt: 'asc' }
+        orderBy: { createdAt: "asc" },
       });
     } catch (error) {
-      console.error('Error fetching product variants:', error);
+      console.error("Error fetching product variants:", error);
       return [];
     }
   },
@@ -66,7 +69,7 @@ export const productVariantService = {
   async getById(id: string): Promise<ProductVariant | null> {
     try {
       return await prisma.productVariant.findUnique({
-        where: { id }
+        where: { id },
       });
     } catch (error) {
       console.error(`Error fetching product variant with ID ${id}:`, error);
@@ -89,12 +92,12 @@ export const productVariantService = {
           attributes: data.attributes,
           imageUrl: normalizeImageUrl(data.imageUrl),
           updatedAt: new Date(),
-        }
+        },
       });
 
       return variant;
     } catch (error) {
-      console.error('Error creating product variant:', error);
+      console.error("Error creating product variant:", error);
       return null;
     }
   },
@@ -102,7 +105,9 @@ export const productVariantService = {
   /**
    * Update an existing product variant
    */
-  async update(data: ProductVariantUpdateInput): Promise<ProductVariant | null> {
+  async update(
+    data: ProductVariantUpdateInput
+  ): Promise<ProductVariant | null> {
     try {
       const variant = await prisma.productVariant.update({
         where: { id: data.id },
@@ -113,12 +118,15 @@ export const productVariantService = {
           ...(data.attributes && { attributes: data.attributes }),
           ...(data.imageUrl && { imageUrl: normalizeImageUrl(data.imageUrl) }),
           updatedAt: new Date(),
-        }
+        },
       });
 
       return variant;
     } catch (error) {
-      console.error(`Error updating product variant with ID ${data.id}:`, error);
+      console.error(
+        `Error updating product variant with ID ${data.id}:`,
+        error
+      );
       return null;
     }
   },
@@ -129,7 +137,7 @@ export const productVariantService = {
   async delete(id: string): Promise<boolean> {
     try {
       await prisma.productVariant.delete({
-        where: { id }
+        where: { id },
       });
       return true;
     } catch (error) {
@@ -149,26 +157,26 @@ export const productVariantService = {
       // Get existing variants for this product
       const existingVariants = await prisma.productVariant.findMany({
         where: { productId },
-        select: { id: true }
+        select: { id: true },
       });
-      
-      const existingIds = new Set(existingVariants.map(v => v.id));
+
+      const existingIds = new Set(existingVariants.map((v) => v.id));
       const updatedIds = new Set(
-        variants.filter(v => v.id).map(v => v.id as string)
+        variants.filter((v) => v.id).map((v) => v.id as string)
       );
-      
+
       // Find IDs to delete (existing but not in updated)
-      const idsToDelete = [...existingIds].filter(id => !updatedIds.has(id));
-      
+      const idsToDelete = [...existingIds].filter((id) => !updatedIds.has(id));
+
       // Start transaction to update all variants at once
       await prisma.$transaction(async (tx) => {
         // Delete variants that are no longer needed
         if (idsToDelete.length > 0) {
           await tx.productVariant.deleteMany({
-            where: { id: { in: idsToDelete } }
+            where: { id: { in: idsToDelete } },
           });
         }
-        
+
         // Update or create variants
         for (const variant of variants) {
           if (variant.id) {
@@ -182,7 +190,7 @@ export const productVariantService = {
                 attributes: variant.attributes,
                 imageUrl: normalizeImageUrl(variant.imageUrl),
                 updatedAt: new Date(),
-              }
+              },
             });
           } else {
             // Create new variant
@@ -196,16 +204,16 @@ export const productVariantService = {
                 attributes: variant.attributes,
                 imageUrl: normalizeImageUrl(variant.imageUrl),
                 updatedAt: new Date(),
-              }
+              },
             });
           }
         }
       });
-      
+
       return true;
     } catch (error) {
-      console.error('Error updating product variants:', error);
+      console.error("Error updating product variants:", error);
       return false;
     }
-  }
+  },
 };
