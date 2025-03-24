@@ -240,20 +240,15 @@ router.put(
       }
 
       // Prepare update data
-      const updateData: any = {
+      const updateData = {
         altText: altText || null,
         isDefault: isDefault === "true" || isDefault === true,
         sortOrder: sortOrder ? parseInt(sortOrder) : existingImage.sortOrder,
-      };
-
-      // Upload new image if provided
-      if (file) {
-        const filename = `product-${Date.now()}-${Math.floor(
-          Math.random() * 100000000
-        )}.${file.originalname.split(".").pop()}`;
-        const destinationPath = `uploads/products/${filename}`;
-        updateData.url = await uploadToCloud(file.path, destinationPath);
-      }
+        productId,
+        createdAt: existingImage.createdAt,
+        updatedAt: new Date(),
+        url: file ? await uploadToCloud(file.path, `uploads/products/${file.filename}`) : existingImage.url
+      } as const;
 
       // Update the image
       const updatedImage = await prisma.productImage.update({

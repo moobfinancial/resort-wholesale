@@ -17,21 +17,43 @@ model Admin {
 }
 
 model Product {
-  id            String           @id @default(uuid())
-  name          String
-  description   String
-  category      String
-  tags          String[]
-  price         Decimal          @db.Decimal(10, 2)
-  imageUrl      String
-  sku           String           @unique
-  stock         Int              @default(0)
-  minOrder      Int              @default(1)
-  isActive      Boolean          @default(true)
-  isFeatured    Boolean          @default(false)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  status        ProductStatus    @default(DRAFT)
+  id              String           @id @default(uuid())
+  name            String
+  description     String
+  category        String
+  tags            String[]
+  price           Decimal          @db.Decimal(10, 2)
+  imageUrl        String
+  sku             String           @unique
+  stock           Int              @default(0)
+  minOrder        Int              @default(1)
+  minStock        Int?             @default(0)
+  isActive        Boolean          @default(true)
+  isFeatured      Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  status          ProductStatus    @default(DRAFT)
+  compareAtPrice  Decimal?         @db.Decimal(10, 2)
+  cost            Decimal?         @db.Decimal(10, 2)
+  barcode         String?
+  weight          Float?
+  dimensions      Json?
+  
+  // Supplier-related fields
+  supplierId       String?
+  supplierSKU      String?
+  supplierCost     Decimal?        @db.Decimal(10, 2)
+  supplierLeadTime Int?
+  supplierMinOrder Int?
+  supplierPackSize Int?
+  supplierPackUnit String?
+  supplierNotes    String?
+
+  // Categorization fields
+  shippingCategory String?
+  taxCategory      String?
+  
+  // Relationships
   BulkPricing   BulkPricing[]
   OrderItem     OrderItem[]
   CartItems     CartItem[]

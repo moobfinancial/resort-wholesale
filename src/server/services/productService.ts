@@ -704,19 +704,40 @@ export const productService = {
   async deleteProduct(id: string): Promise<ApiResponse<{ item: any }>> {
     try {
       // First check if product exists with all related entities
+      // First get the product with basic includes
       const existingProduct = (await prisma.product.findUnique({
         where: { id },
         include: {
           Variants: {
             include: {
-              ProductImage: true,
+              CartItems: true,
             },
           },
           BulkPricing: true,
-          ProductImages: true, // Correct field name for product images
+          ProductImages: true,
           // Include any other related entities here
         },
       })) as any; // Type casting to avoid TypeScript errors
+      
+      // Now separately fetch all product images related to variants
+      if (existingProduct?.Variants?.length > 0) {
+        // Get all variant IDs
+        const variantIds = existingProduct.Variants.map((v: any) => v.id);
+        
+        // Fetch variant images
+        const variantImages = await prisma.productImage.findMany({
+          where: {
+            variantId: {
+              in: variantIds
+            }
+          }
+        });
+        
+        // Add images to each variant
+        existingProduct.Variants.forEach((variant: any) => {
+          variant.images = variantImages.filter((img: any) => img.variantId === variant.id);
+        });
+      }
 
       if (!existingProduct) {
         return {

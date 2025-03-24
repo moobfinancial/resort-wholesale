@@ -266,6 +266,7 @@ router.post(
                   productId,
                   variantId: variantId || null,
                   quantity,
+                  bulkPricingId: null,
                   createdAt: new Date(),
                   updatedAt: new Date(),
                   product,
@@ -295,6 +296,7 @@ router.post(
                 productId,
                 variantId: variantId || null,
                 quantity,
+                bulkPricingId: null,
                 createdAt: new Date(),
                 updatedAt: new Date(),
                 product,
@@ -361,7 +363,18 @@ router.post(
         status: 'success',
         data: {
           item: ensureCartStructure(updatedCart),
-          updatedItem,
+          updatedItem: {
+            id: updatedItem.id,
+            cartId: updatedItem.cartId,
+            productId: updatedItem.productId,
+            variantId: updatedItem.variantId,
+            quantity: updatedItem.quantity,
+            bulkPricingId: updatedItem.bulkPricingId,
+            createdAt: updatedItem.createdAt,
+            updatedAt: updatedItem.updatedAt,
+            product: updatedItem.product,
+            variant: updatedItem.variant,
+          },
         }
       });
     } catch (error) {
@@ -457,7 +470,18 @@ router.put(
         status: 'success',
         data: {
           item: ensureCartStructure(updatedCart),
-          updatedItem,
+          updatedItem: {
+            id: updatedItem.id,
+            cartId: updatedItem.cartId,
+            productId: updatedItem.productId,
+            variantId: updatedItem.variantId,
+            quantity: updatedItem.quantity,
+            bulkPricingId: updatedItem.bulkPricingId,
+            createdAt: updatedItem.createdAt,
+            updatedAt: updatedItem.updatedAt,
+            product: updatedItem.product,
+            variant: updatedItem.variant,
+          },
         }
       });
     } catch (error) {
