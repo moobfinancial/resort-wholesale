@@ -21,7 +21,7 @@ router.post("/login", async (req, res) => {
         id: true,
         email: true,
         name: true,
-        passwordHash: true,
+        password: true,
       },
     });
 
@@ -32,7 +32,7 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, admin.passwordHash);
+    const isPasswordValid = await bcrypt.compare(password, admin.password);
 
     if (!isPasswordValid) {
       return res.status(401).json({

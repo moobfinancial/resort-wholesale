@@ -123,7 +123,7 @@ class AuthService {
         }
 
         // Check if the password hash field exists
-        const passwordHash = admin.passwordHash;
+        const passwordHash = admin.password;
 
         if (!passwordHash) {
           return {
