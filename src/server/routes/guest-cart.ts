@@ -3,17 +3,32 @@ import { prisma, isPrismaConnected } from '../../lib/prisma';
 import { body, param } from 'express-validator';
 import { validateRequest } from '../middleware/validate';
 import type { Product, ProductVariant } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import crypto from 'crypto';
 
 const router = express.Router();
 
 // Define types for our cart responses
+type ExtendedProduct = Product & {
+  images?: any[];
+  shippingCategory?: string | null;
+  taxCategory?: string | null;
+  supplierId?: string | null;
+  supplierSKU?: string | null;
+  supplierCost?: Decimal | null;
+  supplierLeadTime?: number | null;
+  supplierMinOrder?: number | null;
+  supplierPackSize?: number | null;
+  supplierPackUnit?: string | null;
+  supplierNotes?: string | null;
+};
+
 type GuestCartItem = {
   id: string;
   productId: string;
   variantId?: string | null;
   quantity: number;
-  product: Product;
+  product: ExtendedProduct;
   variant?: ProductVariant | null;
 };
 
@@ -104,39 +119,22 @@ router.get('/:cartId?', async (req: Request, res: Response<CartResponse>) => {
           
           // Update cart items with product and variant details
           cart.items = cart.items.map(item => {
-            const product = products.find(p => p.id === item.productId);
-            const variant = item.variantId 
-              ? variants.find(v => v.id === item.variantId)
-              : null;
+            // Find the actual product from the database
+            const foundProduct = products.find(p => p.id === item.productId);
             
+            // If product is found, use its data, otherwise use current data as fallback
             return {
               ...item,
-              product: product ? {
-                ...product,
-                images: product.imageUrl ? [product.imageUrl] : [],
-              } : {
-                id: item.productId,
-                name: 'Unknown Product',
-                description: '',
-                category: '',
-                tags: [],
-                price: 0 as any,
-                imageUrl: '',
-                sku: '',
-                stock: 0,
-                minOrder: 1,
-                isActive: true,
-                isFeatured: false,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                status: 'DRAFT' as any,
-                collectionId: null,
-                images: []
+              product: foundProduct || {
+                // Keep the current product data if not found in database
+                ...item.product,
+                // Ensure minStock is included
+                minStock: item.product.minStock || 0,
+                images: item.product.images || []
               },
-              variant: variant ? {
-                ...variant,
-                attributes: {} // Ensure attributes exists even if empty
-              } : null
+              variant: item.variantId 
+                ? variants.find(v => v.id === item.variantId)
+                : null
             };
           });
         } catch (dbError) {

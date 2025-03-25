@@ -6,8 +6,9 @@ import bcrypt from "bcrypt";
 interface AdminUser {
   id: string;
   email: string;
-  name?: string;
-  role?: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Standard API response
@@ -82,8 +83,10 @@ class AuthService {
     const payload = {
       id: user.id,
       email: user.email,
-      role: user.role || "ADMIN",
+      role: "ADMIN",
       name: user.name,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
     };
 
     // @ts-ignore - Ignore type checking for this line
@@ -120,7 +123,7 @@ class AuthService {
         }
 
         // Check if the password hash field exists
-        const passwordHash = admin.password || (admin as any).password;
+        const passwordHash = admin.password;
 
         if (!passwordHash) {
           return {
@@ -147,7 +150,8 @@ class AuthService {
           id: admin.id,
           email: admin.email,
           name: admin.name,
-          role: (admin as any).role || "ADMIN",
+          createdAt: admin.createdAt,
+          updatedAt: admin.updatedAt,
         });
 
         // Return success response with admin and token
@@ -157,8 +161,9 @@ class AuthService {
             admin: {
               id: admin.id,
               email: admin.email,
-              name: admin.name || "Admin User",
-              role: (admin as any).role || "ADMIN",
+              name: admin.name,
+              createdAt: admin.createdAt,
+              updatedAt: admin.updatedAt,
             },
             token,
           },
@@ -226,7 +231,8 @@ class AuthService {
       id: "1",
       email: "admin@resortfresh.com",
       name: "Development Admin",
-      role: "ADMIN",
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
     const token = this.generateToken(adminUser, "7d");

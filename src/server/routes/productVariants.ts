@@ -33,6 +33,9 @@ const ProductVariantSchema = z.object({
   stock: z.number().int().nonnegative("Stock must be non-negative"),
   attributes: z.record(z.string()),
   imageUrl: z.string().optional(),
+  productId: z.string(),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
 });
 
 const upload = multer({
