@@ -53,6 +53,7 @@ const CollectionProducts: React.FC = () => {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   console.log("collection", collection);
+  console.log("products", products[0]?.imageUrl);
   useEffect(() => {
     if (id) {
       startTransition(() => {
@@ -113,6 +114,12 @@ const CollectionProducts: React.FC = () => {
           Array.isArray(response.data.data.products)
         ) {
           setProducts(response.data.data.products);
+        } else if (
+          response.data.data &&
+          Array.isArray(response.data.data.items)
+        ) {
+          // Handle the actual backend response structure
+          setProducts(response.data.data.items);
         } else {
           console.error("Unexpected data structure:", response.data);
           setError("Unexpected data structure in API response");
@@ -154,11 +161,10 @@ const CollectionProducts: React.FC = () => {
           setAvailableProducts(response.data.data.products);
         } else if (
           response.data.data &&
-          response.data.data.hasOwnProperty("products") &&
-          Array.isArray(response.data.data.products)
+          Array.isArray(response.data.data.items)
         ) {
-          console.log("Found products array in response.data.data.products");
-          setAvailableProducts(response.data.data.products);
+          console.log("Found items array in response.data.data.items");
+          setAvailableProducts(response.data.data.items);
         } else if (Array.isArray(response.data.data)) {
           console.log("Found array in response.data.data");
           setAvailableProducts(response.data.data);
@@ -287,33 +293,12 @@ const CollectionProducts: React.FC = () => {
       key: "imageUrl",
       render: (imageUrl: string) => (
         <Image
-          src={imageUrl || "/images/products/placeholder.jpg"}
+          src={
+            "/images/products/" + imageUrl || "/images/products/placeholder.jpg"
+          }
           alt="Product"
           style={{ width: 50, height: 50, objectFit: "cover" }}
           preview={false}
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            // First try loading with /images/products/ path if not already there
-            if (
-              !target.src.includes("/images/products/") &&
-              !target.src.includes("placeholder")
-            ) {
-              const filename = target.src.split("/").pop();
-              target.src = `/images/products/${filename || "placeholder.jpg"}`;
-            }
-            // Then try with /uploads/products/ path if the above fails
-            else if (
-              !target.src.includes("/uploads/products/") &&
-              !target.src.includes("placeholder")
-            ) {
-              const filename = target.src.split("/").pop();
-              target.src = `/uploads/products/${filename || "placeholder.jpg"}`;
-            }
-            // Finally, use the placeholder
-            else if (!target.src.includes("placeholder")) {
-              target.src = "/images/products/placeholder.jpg";
-            }
-          }}
         />
       ),
     },
